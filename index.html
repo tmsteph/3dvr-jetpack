@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>3dvr.tech Jetpack Game – Creative Ascension (Back View)</title>
+  <title>3dvr.tech Jetpack Game – Walk, Rotate, and Take Off!</title>
   <!-- Ensure proper scaling on mobile devices -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
@@ -97,36 +97,40 @@
   <!-- All-in-one game code -->
   <script>
     /**
-     * 3dvr.tech Jetpack Game – Creative Ascension (Back View)
+     * 3dvr.tech Jetpack Game – Walk, Rotate, and Take Off!
      *
-     * In this level a creatively designed path of beautifully styled 3dvr.tech billboards
-     * guides the player upward and forward along loops and oscillations. The collision threshold
-     * is increased (to 4 units) to make hitting the billboards easier. Also, the player model is
-     * rotated so that you see his back. Reach near the top (vertical win height) to win!
+     * In this level, you control a character whose movement is based on rotation and forward/backward walking.
+     * A clear corridor of stylish 3dvr.tech billboards is placed on the ground in front of you (mostly along the Z‑axis),
+     * so you can hit many boxes as you walk around. When you press Space, your jetpack engages so you can take off.
+     * Win the level by reaching a forward position (Z ≥ 200).
      */
 
     // GLOBAL VARIABLES
     let scene, camera, renderer, clock;
-    let player, playerVelocity;
-    const keys = {};           // For keyboard & mobile control states
+    let player; // our player object (a glTF model or fallback)
+    let playerVelocity = new THREE.Vector3();
+    const keys = {};           // Track keyboard & mobile control states
     let score = 0;
-    let gameActive = true;     // Game runs until win condition
-    const pathBillboards = []; // Billboards forming the creative path
-    const winHeight = 100;     // Height at which the level is won
-    const hitEffects = [];     // Array to hold active hit effects
+    let gameActive = true;     // Game is active until win condition
+    const pathBillboards = []; // Billboards that form the path
+    const hitEffects = [];     // Active hit effects
+    const winZ = 200;          // Win when player's Z coordinate reaches this value
 
-    // Increase collision threshold for even easier hits.
-    const COLLISION_THRESHOLD = 4; // Increased from 3 to 4 units
+    // Increase collision threshold for easier hits.
+    const COLLISION_THRESHOLD = 4; // Units
 
-    // PHYSICS & CONTROL CONSTANTS
+    // MOVEMENT CONSTANTS
+    const rotationSpeed = 2;   // Radians per second for turning
+    const moveSpeed = 5;       // Units per second for walking forward/backward
+    const jetpackSpeed = 10;   // Units per second upward when jetpacking
+
+    // PHYSICS (for jetpack only)
     const GRAVITY = new THREE.Vector3(0, -9.8, 0);
-    const THRUST = 20;
-    const MOVE_ACCEL = 10;
-    const MAX_SPEED = 50;
+    const THRUST = 20;  // Not used in walking mode—only for additional upward acceleration if desired
 
     // INITIALIZATION FUNCTION
     function init() {
-      // Set up scene, camera, renderer, and clock
+      // Set up the scene, camera, renderer, and clock
       scene = new THREE.Scene();
       scene.background = new THREE.Color(0x87ceeb);
       camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -144,15 +148,15 @@
       scene.add(directionalLight);
 
       // Ground plane
-      const groundGeo = new THREE.PlaneGeometry(200, 200);
+      const groundGeo = new THREE.PlaneGeometry(500, 500);
       const groundMat = new THREE.MeshStandardMaterial({ color: 0x228b22 });
       const ground = new THREE.Mesh(groundGeo, groundMat);
       ground.rotation.x = -Math.PI / 2;
       ground.position.y = 0;
       scene.add(ground);
 
-      // Create the creative, forward‑moving path of billboards
-      createSpiralPath();
+      // Create a clear forward path of billboards
+      createPath();
 
       // Set up event listeners and mobile controls
       window.addEventListener('resize', onWindowResize, false);
@@ -205,10 +209,11 @@
         function(gltf) {
           player = gltf.scene;
           player.scale.set(0.5, 0.5, 0.5);
-          player.position.set(0, 2, 0);
-          // Rotate the model 180° so we see his back
+          // Start the player at ground level with a slight offset
+          player.position.set(0, 1, 0);
+          // Rotate the player 180° so you see his back
           player.rotation.y = Math.PI;
-          // Attach a jetpack flame
+          // Attach a jetpack flame (for takeoff)
           const flameGeo = new THREE.ConeGeometry(0.2, 0.5, 8);
           const flameMat = new THREE.MeshBasicMaterial({ color: 0xffa500 });
           const flameMesh = new THREE.Mesh(flameGeo, flameMat);
@@ -220,7 +225,6 @@
           // Add branding above the player
           addPlayerBranding();
           scene.add(player);
-          playerVelocity = new THREE.Vector3();
           animate();
         },
         undefined,
@@ -240,9 +244,8 @@
           flameMesh.name = "flame";
           player.add(flameMesh);
           addPlayerBranding();
-          player.position.set(0, 2, 0);
+          player.position.set(0, 1, 0);
           scene.add(player);
-          playerVelocity = new THREE.Vector3();
           animate();
         }
       );
@@ -286,28 +289,30 @@
       return new THREE.Mesh(geometry, material);
     }
 
-    // CREATE A CREATIVE SPIRAL PATH (HELIX) OF BILLBOARDS THAT MOVES FORWARD
-    // This path now moves even more forward (using a forward offset factor of 50)
-    // while ascending and adding extra oscillations for fun loops and patterns.
-    function createSpiralPath() {
-      const numBillboards = 40;
-      const spiralRadius = 5;  // Base radius of the spiral
-      for (let i = 0; i < numBillboards; i++) {
-        let t = i / (numBillboards - 1);  // t ranges from 0 to 1
-        // Use 4 full rotations over the course of the path
-        let theta = 4 * Math.PI * t;
-        // Increased forward movement: a larger linear offset in the X direction
-        let forwardOffset = 50 * t;
-        // Compute X, Y, Z with extra oscillatory terms for creative loops:
-        let x = forwardOffset + spiralRadius * Math.cos(theta);
-        let y = winHeight * t + 2 * Math.sin(4 * Math.PI * t);
-        let z = spiralRadius * Math.sin(theta) + 2 * Math.cos(4 * Math.PI * t);
+    // CREATE A CLEAR, FORWARD PATH OF BILLBOARDS
+    // The path is mostly horizontal (forward along the Z‑axis) with a little lateral oscillation.
+    function createPath() {
+      const numBoxes = 30;
+      for (let i = 0; i < numBoxes; i++) {
+        const t = i / (numBoxes - 1);
+        // Z goes from 20 to 200 (mostly forward)
+        const z = 20 + t * 180;
+        // X oscillates to add a bit of variation
+        const x = 5 * Math.sin(2 * Math.PI * t);
+        const y = 2; // slightly above ground
         const billboard = createBillboard("3dvr.tech");
         billboard.scale.set(1, 1, 1);
         billboard.position.set(x, y, z);
         scene.add(billboard);
         pathBillboards.push(billboard);
       }
+    }
+
+    // We'll use createPath() instead of the previous spiral function.
+    // Call createPath() in init() below.
+    function createSpiralPath() {
+      // For backward compatibility if needed.
+      createPath();
     }
 
     // CREATE A HIT EFFECT AT THE GIVEN POSITION
@@ -332,15 +337,14 @@
     }
 
     // CHECK FOR COLLISIONS BETWEEN THE PLAYER AND PATH BILLBOARDS
-    // When a collision is detected, spawn a hit effect, remove the billboard,
-    // and award points.
+    // When a collision is detected, spawn a hit effect, remove the billboard, and award points.
     function checkCollisions() {
       if (!player) return;
       const playerPos = player.position;
       for (let i = pathBillboards.length - 1; i >= 0; i--) {
         const billboard = pathBillboards[i];
         const distance = playerPos.distanceTo(billboard.position);
-        if (distance < COLLISION_THRESHOLD) { // Forgiving collision threshold
+        if (distance < COLLISION_THRESHOLD) {
           createHitEffect(billboard.position);
           scene.remove(billboard);
           pathBillboards.splice(i, 1);
@@ -350,9 +354,9 @@
       }
     }
 
-    // CHECK THE WIN CONDITION – Has the player reached near the top?
+    // CHECK THE WIN CONDITION – Has the player reached near the end of the path?
     function checkWin() {
-      if (player && player.position.y >= winHeight - 2 && gameActive) {
+      if (player && player.position.z >= winZ && gameActive) {
         winLevel();
       }
     }
@@ -377,15 +381,60 @@
     function onKeyDown(e) { keys[e.key] = true; }
     function onKeyUp(e) { keys[e.key] = false; }
 
+    // UPDATE PLAYER MOVEMENT AND CAMERA FOLLOWING
+    function updatePlayer(delta) {
+      if (!gameActive || !player) return;
+      
+      // ROTATION: Use A/D to turn
+      if (keys["a"]) {
+        player.rotation.y += rotationSpeed * delta;
+      }
+      if (keys["d"]) {
+        player.rotation.y -= rotationSpeed * delta;
+      }
+      
+      // FORWARD/BACKWARD: Move along the player's local forward direction
+      let forward = new THREE.Vector3(0, 0, -1);
+      forward.applyQuaternion(player.quaternion);
+      forward.y = 0; // restrict to horizontal movement
+      forward.normalize();
+      
+      if (keys["w"]) {
+        player.position.addScaledVector(forward, moveSpeed * delta);
+      }
+      if (keys["s"]) {
+        player.position.addScaledVector(forward, -moveSpeed * delta);
+      }
+      
+      // JETPACK: If Space is pressed, allow upward movement.
+      // Otherwise, keep the player on the ground (y = 1).
+      if (keys[" "]) {
+        player.position.y += jetpackSpeed * delta;
+      } else {
+        player.position.y = 1;
+      }
+      
+      // Update camera: Position the camera behind and above the player.
+      let desiredCameraPos = new THREE.Vector3().copy(player.position);
+      let backward = new THREE.Vector3(0, 0, 1);
+      backward.applyQuaternion(player.quaternion);
+      backward.y = 0;
+      backward.normalize();
+      desiredCameraPos.addScaledVector(backward, 10); // 10 units behind
+      desiredCameraPos.y += 5; // 5 units above
+      camera.position.lerp(desiredCameraPos, 0.1);
+      camera.lookAt(player.position);
+    }
+
     // ANIMATION LOOP
     function animate() {
       requestAnimationFrame(animate);
-      if (!gameActive) return;  // Freeze game when level is won
+      if (!gameActive) return;
       const delta = clock.getDelta();
       updatePlayer(delta);
       checkCollisions();
       checkWin();
-
+      
       // Update active hit effects
       for (let i = hitEffects.length - 1; i >= 0; i--) {
         const effect = hitEffects[i];
@@ -399,49 +448,16 @@
           effect.material.opacity = 1 - t;     // Fade out the ring
         }
       }
-
+      
       // Make the path billboards always face the camera
       pathBillboards.forEach(b => b.lookAt(camera.position));
       renderer.render(scene, camera);
     }
 
-    // UPDATE PLAYER MOVEMENT AND CAMERA FOLLOWING
-    function updatePlayer(delta) {
-      if (!gameActive) return;
-      let acceleration = new THREE.Vector3().copy(GRAVITY);
-      if (keys[" "] || keys["Spacebar"]) {
-        acceleration.y += THRUST;
-        const flame = player.getObjectByName("flame");
-        if (flame) flame.visible = true;
-      } else {
-        const flame = player.getObjectByName("flame");
-        if (flame) flame.visible = false;
-      }
-      if (keys["w"] || keys["W"] || keys["ArrowUp"]) acceleration.z -= MOVE_ACCEL;
-      if (keys["s"] || keys["S"] || keys["ArrowDown"]) acceleration.z += MOVE_ACCEL;
-      if (keys["a"] || keys["A"] || keys["ArrowLeft"]) acceleration.x -= MOVE_ACCEL;
-      if (keys["d"] || keys["D"] || keys["ArrowRight"]) acceleration.x += MOVE_ACCEL;
-      playerVelocity.addScaledVector(acceleration, delta);
-      if (playerVelocity.length() > MAX_SPEED) playerVelocity.setLength(MAX_SPEED);
-      player.position.addScaledVector(playerVelocity, delta);
-      const minHeight = 1;
-      if (player.position.y < minHeight) {
-        player.position.y = minHeight;
-        playerVelocity.y = 0;
-      }
-      playerVelocity.multiplyScalar(0.99);
-      // Smoothly update the camera to follow the player
-      const desiredCameraPos = new THREE.Vector3(
-        player.position.x,
-        player.position.y + 5,
-        player.position.z + 10
-      );
-      camera.position.lerp(desiredCameraPos, 0.1);
-      camera.lookAt(player.position);
-    }
-
     // START THE GAME
+    // Use createPath() to generate the clear, forward path.
     init();
+    createPath();
   </script>
 </body>
 </html>
