@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>3dvr.tech Jetpack Game – Arrow Keys Only (Back View with Loading)</title>
+  <title>3dvr.tech Jetpack Game – Arrow Keys Only (Back View with Loading Fix)</title>
   <!-- Ensure proper scaling on mobile devices -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
@@ -117,16 +117,19 @@
   <!-- All-in-one game code -->
   <script>
     /**
-     * 3dvr.tech Jetpack Game – Arrow Keys Only (Back View with Loading)
+     * 3dvr.tech Jetpack Game – Arrow Keys Only (Back View with Loading Fix)
      *
-     * - You control the character with the Arrow keys (Space for jetpack).
-     *   * ArrowLeft/ArrowRight rotate the player.
-     *   * ArrowUp/ArrowDown move the player forward/backward in the direction he's facing.
-     *   * Space engages the jetpack (vertical thrust).
-     * - The player’s model is initially set so his back faces the camera.
-     * - A corridor of 3dvr.tech billboards is placed along the Z-axis.
-     * - The level is won when the player's Z coordinate reaches 200.
-     * - A loading overlay is displayed until the player model finishes loading.
+     * Controls (Arrow keys only, and Space for jetpack):
+     * - ArrowLeft/ArrowRight rotate the player.
+     * - ArrowUp/ArrowDown move the player forward/backward in the direction he’s facing.
+     * - Space engages the jetpack (vertical thrust).
+     *
+     * A corridor of 3dvr.tech billboards is placed along the Z-axis (from z=20 to z=200).
+     * The level is won when the player's Z coordinate reaches 200.
+     * A loading overlay is displayed until the player model (or fallback) is loaded.
+     * 
+     * In case the player model is not loaded yet, the update function sets a default camera
+     * so the corridor is visible.
      */
 
     // GLOBAL VARIABLES
@@ -136,8 +139,8 @@
     const keys = {}; // To track key states
     let score = 0;
     let gameActive = true;
-    const pathBillboards = []; // Array for the path billboards
-    const hitEffects = [];     // Array for active hit effects
+    const pathBillboards = []; // Path billboards
+    const hitEffects = [];     // Hit effects
     const winZ = 200;          // Win condition: player's Z >= 200
 
     // Collision threshold (for forgiving collisions)
@@ -177,7 +180,7 @@
       ground.position.y = 0;
       scene.add(ground);
 
-      // Create a forward corridor of billboards along the Z-axis.
+      // Create the corridor of billboards along the Z-axis.
       createPath();
 
       // Set up event listeners and mobile controls.
@@ -186,10 +189,10 @@
       window.addEventListener('keyup', onKeyUp, false);
       initMobileControls();
 
-      // Start the animation loop immediately.
+      // Start the animation loop immediately so the scene shows.
       animate();
 
-      // Begin loading the player model.
+      // Load the player model.
       loadPlayer();
     }
 
@@ -264,10 +267,10 @@
           player.scale.set(0.5, 0.5, 0.5);
           // Start at ground level.
           player.position.set(0, groundLevel, 0);
-          // Set rotation so his back faces the camera.
-          // For this model, leaving rotation at 0 yields the desired view.
+          // Set player's rotation so his back faces the camera.
+          // For this model, leaving rotation at 0 gives the desired view.
           player.rotation.y = 0;
-          // Attach a jetpack flame for takeoff.
+          // Attach a jetpack flame.
           const flameGeo = new THREE.ConeGeometry(0.2, 0.5, 8);
           const flameMat = new THREE.MeshBasicMaterial({ color: 0xffa500 });
           const flameMesh = new THREE.Mesh(flameGeo, flameMat);
@@ -285,7 +288,7 @@
         undefined,
         function(error) {
           console.error("Error loading model", error);
-          // Use a fallback simple red sphere.
+          // Fallback: simple red sphere.
           player = new THREE.Object3D();
           const bodyGeo = new THREE.SphereGeometry(0.5, 16, 16);
           const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
@@ -347,7 +350,7 @@
     }
 
     // CREATE A CLEAR, FORWARD PATH OF BILLBOARDS.
-    // The corridor runs mostly along the Z‑axis from z = 20 to z = 200.
+    // The corridor runs mostly along the Z-axis from z = 20 to z = 200.
     function createPath() {
       const numBoxes = 30;
       for (let i = 0; i < numBoxes; i++) {
@@ -419,7 +422,7 @@
       document.getElementById("hud").textContent = "Score: " + score;
     }
 
-    // EVENT HANDLERS
+    // EVENT HANDLERS.
     function onWindowResize() {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
@@ -429,9 +432,15 @@
     // UPDATE PLAYER MOVEMENT AND CAMERA FOLLOWING.
     // The player rotates with ArrowLeft/ArrowRight and moves forward/backward with ArrowUp/ArrowDown.
     // Pressing Space engages the jetpack for upward movement.
-    // Vertical motion is handled smoothly using a simple gravity integration.
+    // Vertical motion is handled smoothly using gravity integration.
     function updatePlayer(delta) {
-      if (!gameActive || !player) return;
+      // If no player is loaded yet, update camera with a default view.
+      if (!player) {
+        // Set camera to look into the corridor.
+        camera.position.lerp(new THREE.Vector3(0, 5, 15), 0.1);
+        camera.lookAt(new THREE.Vector3(0, 2, 100));
+        return;
+      }
       
       // ROTATION: Use ArrowLeft to turn left, ArrowRight to turn right.
       if (keys["ArrowLeft"]) {
@@ -441,10 +450,10 @@
         player.rotation.y -= rotationSpeed * delta;
       }
       
-      // HORIZONTAL movement: Compute the forward vector from the player's current rotation.
+      // HORIZONTAL movement: Compute the forward vector.
       let forward = new THREE.Vector3(0, 0, -1);
       forward.applyQuaternion(player.quaternion);
-      forward.y = 0; // Restrict to horizontal movement.
+      forward.y = 0; // keep movement horizontal
       forward.normalize();
       
       // Move forward/backward.
@@ -455,8 +464,7 @@
         player.position.addScaledVector(forward, -moveSpeed * delta);
       }
       
-      // VERTICAL movement: If Space is pressed, set vertical velocity to jetpack thrust;
-      // otherwise, apply gravity to the vertical velocity.
+      // VERTICAL movement: If Space is pressed, set vertical velocity; else apply gravity.
       if (keys[" "]) {
         playerVelocity.y = jetpackSpeed;
       } else {
@@ -466,13 +474,13 @@
       // Update vertical position.
       player.position.y += playerVelocity.y * delta;
       
-      // Clamp the player to ground level.
+      // Clamp to ground level.
       if (player.position.y < groundLevel) {
         player.position.y = groundLevel;
         playerVelocity.y = 0;
       }
       
-      // Update the camera: Position it behind and above the player.
+      // Update camera: Place it behind and above the player.
       let desiredCameraPos = new THREE.Vector3().copy(player.position);
       let backward = new THREE.Vector3(0, 0, 1);
       backward.applyQuaternion(player.quaternion);
@@ -484,7 +492,7 @@
       camera.lookAt(player.position);
     }
 
-    // ANIMATION LOOP
+    // ANIMATION LOOP.
     function animate() {
       requestAnimationFrame(animate);
       if (!gameActive) return;
@@ -507,13 +515,13 @@
         }
       }
       
-      // Make the path billboards always face the camera.
+      // Ensure the path billboards always face the camera.
       pathBillboards.forEach(b => b.lookAt(camera.position));
       
       renderer.render(scene, camera);
     }
 
-    // START THE GAME
+    // START THE GAME.
     init();
   </script>
 </body>
