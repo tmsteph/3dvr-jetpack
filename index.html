@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>3dvr.tech Jetpack Game – Arrow Keys Only (Smooth Landing)</title>
+  <title>3dvr.tech Jetpack Game – Arrow Keys Only (Back View)</title>
   <!-- Ensure proper scaling on mobile devices -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
@@ -76,7 +76,7 @@
 <body>
   <!-- HUD for score -->
   <div id="hud">Score: 0</div>
-  <!-- Win message overlay (hidden until win condition is met) -->
+  <!-- Win message overlay -->
   <div id="winMessage">You Win!</div>
 
   <!-- Mobile on‑screen controls -->
@@ -98,24 +98,22 @@
   <!-- All-in-one game code -->
   <script>
     /**
-     * 3dvr.tech Jetpack Game – Arrow Keys Only (Smooth Landing)
+     * 3dvr.tech Jetpack Game – Arrow Keys Only (Back View)
      *
      * In this level you control a character using only the Arrow keys (and Space for jetpack).
      * - ArrowLeft/ArrowRight rotate the player.
      * - ArrowUp/ArrowDown move the player forward/backward in the direction he's facing.
-     * - Space activates the jetpack (adding upward thrust).
+     * - Space activates the jetpack (allowing upward movement).
      *
-     * The player’s model is initially rotated so his back faces the camera.
-     * A corridor of 3dvr.tech billboards is placed along the Z‑axis.
-     * The win condition is met when the player's Z coordinate reaches 200.
-     * Vertical movement is now integrated using a simple gravity simulation so that releasing the spacebar
-     * causes the player to land smoothly instead of snapping abruptly.
+     * A corridor of 3dvr.tech billboards is placed along the Z‑axis,
+     * and the win condition is met when the player's Z coordinate reaches 200.
+     *
+     * This version now sets the player's initial Y‑rotation to 0 so his back faces the camera.
      */
 
     // GLOBAL VARIABLES
     let scene, camera, renderer, clock;
     let player; // The player object (a glTF model or fallback)
-    // We'll use playerVelocity as a full 3D velocity vector (including y)
     let playerVelocity = new THREE.Vector3();
     const keys = {}; // To track key states
     let score = 0;
@@ -130,9 +128,7 @@
     // MOVEMENT CONSTANTS
     const rotationSpeed = 2;   // Radians per second for turning
     const moveSpeed = 5;       // Units per second for walking
-    const jetpackThrust = 10;  // Upward units per second when jetpack is active
-    const gravity = -9.8;      // Gravity acceleration (units per second squared)
-    const groundLevel = 1;     // y-coordinate of the ground
+    const jetpackSpeed = 10;   // Units per second upward when jetpack is engaged
 
     // INITIALIZATION FUNCTION
     function init() {
@@ -243,10 +239,11 @@
         function(gltf) {
           player = gltf.scene;
           player.scale.set(0.5, 0.5, 0.5);
-          // Start at ground level
-          player.position.set(0, groundLevel, 0);
-          // Rotate 180° so his back faces the camera
-          player.rotation.y = Math.PI;
+          // Start the player at ground level
+          player.position.set(0, 1, 0);
+          // Set the player's rotation so his back faces the camera.
+          // (For this model, leaving rotation at 0 yields the desired result.)
+          player.rotation.y = 0;
           // Attach a jetpack flame for takeoff
           const flameGeo = new THREE.ConeGeometry(0.2, 0.5, 8);
           const flameMat = new THREE.MeshBasicMaterial({ color: 0xffa500 });
@@ -278,7 +275,7 @@
           flameMesh.name = "flame";
           player.add(flameMesh);
           addPlayerBranding();
-          player.position.set(0, groundLevel, 0);
+          player.position.set(0, 1, 0);
           scene.add(player);
           animate();
         }
@@ -405,8 +402,8 @@
 
     // UPDATE PLAYER MOVEMENT AND CAMERA FOLLOWING
     // The player rotates with ArrowLeft/ArrowRight and moves forward/backward with ArrowUp/ArrowDown.
-    // Pressing Space engages the jetpack for upward movement. Vertical motion is handled smoothly:
-    // If Space is pressed, the vertical velocity is set to a positive value; otherwise, gravity is applied.
+    // Pressing Space engages the jetpack for upward movement.
+    // Vertical motion uses a simple gravity integration for smooth landing.
     function updatePlayer(delta) {
       if (!gameActive || !player) return;
       
@@ -432,25 +429,25 @@
         player.position.addScaledVector(forward, -moveSpeed * delta);
       }
       
-      // VERTICAL movement: Use Space to engage the jetpack.
+      // VERTICAL movement: Use Space for jetpack thrust. Otherwise, apply gravity.
       if (keys[" "]) {
-        // When Space is pressed, set vertical velocity to jetpackThrust.
-        playerVelocity.y = jetpackThrust;
+        // Set vertical velocity to jetpack thrust.
+        playerVelocity.y = jetpackSpeed;
       } else {
-        // Otherwise, apply gravity to the vertical velocity.
+        // Apply gravity to vertical velocity.
         playerVelocity.y += gravity * delta;
       }
       
-      // Update vertical position using the vertical velocity.
+      // Update vertical position based on vertical velocity.
       player.position.y += playerVelocity.y * delta;
       
-      // If the player falls below the ground, clamp to ground level and reset vertical velocity.
-      if (player.position.y < groundLevel) {
-        player.position.y = groundLevel;
+      // Clamp the player to the ground level if they fall too low.
+      if (player.position.y < 1) {
+        player.position.y = 1;
         playerVelocity.y = 0;
       }
       
-      // Update the camera: position it behind and above the player.
+      // Update the camera: Position it behind and above the player.
       let desiredCameraPos = new THREE.Vector3().copy(player.position);
       let backward = new THREE.Vector3(0, 0, 1);
       backward.applyQuaternion(player.quaternion);
@@ -487,7 +484,6 @@
       
       // Make the path billboards always face the camera.
       pathBillboards.forEach(b => b.lookAt(camera.position));
-      
       renderer.render(scene, camera);
     }
 
