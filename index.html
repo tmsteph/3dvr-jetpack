@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>3dvr.tech Jetpack Game – Creative Ascension</title>
+  <title>3dvr.tech Jetpack Game – Creative Ascension (Back View)</title>
   <!-- Ensure proper scaling on mobile devices -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
@@ -97,12 +97,12 @@
   <!-- All-in-one game code -->
   <script>
     /**
-     * 3dvr.tech Jetpack Game – Creative Ascension
+     * 3dvr.tech Jetpack Game – Creative Ascension (Back View)
      *
      * In this level a creatively designed path of beautifully styled 3dvr.tech billboards
-     * guides the player upward while moving forward. The path features loops and oscillations,
-     * making it fun and challenging to follow. When you fly through a billboard, an expanding
-     * ring hit effect appears. Reach near the top (vertical win height) to win!
+     * guides the player upward and forward along loops and oscillations. The collision threshold
+     * is increased (to 4 units) to make hitting the billboards easier. Also, the player model is
+     * rotated so that you see his back. Reach near the top (vertical win height) to win!
      */
 
     // GLOBAL VARIABLES
@@ -115,8 +115,8 @@
     const winHeight = 100;     // Height at which the level is won
     const hitEffects = [];     // Array to hold active hit effects
 
-    // Collision threshold (for forgiving collisions)
-    const COLLISION_THRESHOLD = 3; // Increased from 2 to 3 units
+    // Increase collision threshold for even easier hits.
+    const COLLISION_THRESHOLD = 4; // Increased from 3 to 4 units
 
     // PHYSICS & CONTROL CONSTANTS
     const GRAVITY = new THREE.Vector3(0, -9.8, 0);
@@ -206,6 +206,8 @@
           player = gltf.scene;
           player.scale.set(0.5, 0.5, 0.5);
           player.position.set(0, 2, 0);
+          // Rotate the model 180° so we see his back
+          player.rotation.y = Math.PI;
           // Attach a jetpack flame
           const flameGeo = new THREE.ConeGeometry(0.2, 0.5, 8);
           const flameMat = new THREE.MeshBasicMaterial({ color: 0xffa500 });
@@ -285,8 +287,8 @@
     }
 
     // CREATE A CREATIVE SPIRAL PATH (HELIX) OF BILLBOARDS THAT MOVES FORWARD
-    // This path moves forward along the X‑axis while ascending, and adds extra loops
-    // and oscillations in the Y and Z directions to create a fun, dynamic route.
+    // This path now moves even more forward (using a forward offset factor of 50)
+    // while ascending and adding extra oscillations for fun loops and patterns.
     function createSpiralPath() {
       const numBillboards = 40;
       const spiralRadius = 5;  // Base radius of the spiral
@@ -294,9 +296,9 @@
         let t = i / (numBillboards - 1);  // t ranges from 0 to 1
         // Use 4 full rotations over the course of the path
         let theta = 4 * Math.PI * t;
-        // Forward movement: a linear offset in the X direction
-        let forwardOffset = 20 * t;
-        // Compute X, Y, Z with extra oscillatory terms for loops and creativity:
+        // Increased forward movement: a larger linear offset in the X direction
+        let forwardOffset = 50 * t;
+        // Compute X, Y, Z with extra oscillatory terms for creative loops:
         let x = forwardOffset + spiralRadius * Math.cos(theta);
         let y = winHeight * t + 2 * Math.sin(4 * Math.PI * t);
         let z = spiralRadius * Math.sin(theta) + 2 * Math.cos(4 * Math.PI * t);
