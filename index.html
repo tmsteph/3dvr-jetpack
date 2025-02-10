@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>3dvr.tech Jetpack Game – Walk, Rotate, and Take Off!</title>
+  <title>3dvr.tech Jetpack Game – Arrow Key Controls</title>
   <!-- Ensure proper scaling on mobile devices -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
@@ -76,11 +76,12 @@
 <body>
   <!-- HUD for score -->
   <div id="hud">Score: 0</div>
-  <!-- Win message overlay -->
+  <!-- Win message overlay (hidden until win condition is met) -->
   <div id="winMessage">You Win!</div>
 
   <!-- Mobile on‑screen controls -->
   <div id="dpad">
+    <!-- We'll label the buttons with arrow symbols -->
     <button id="up-btn">↑</button>
     <div>
       <button id="left-btn">←</button>
@@ -97,13 +98,16 @@
   <!-- All-in-one game code -->
   <script>
     /**
-     * 3dvr.tech Jetpack Game – Walk, Rotate, and Take Off!
+     * 3dvr.tech Jetpack Game – Arrow Key Controls
      *
-     * You control a character whose movement is based on rotation and forward/backward walking.
-     * A clear corridor of stylish 3dvr.tech billboards is placed in front of you (along the Z‑axis)
-     * so you can hit many boxes before taking off. Pressing Space engages your jetpack so you can rise.
-     * Win the level by reaching Z ≥ 200. Both WASD and Arrow keys work.
-     * The player’s model is initially rotated 180° so his back faces the camera.
+     * In this level you control a character using only the Arrow keys (and Space for jetpack).
+     * - ArrowLeft/ArrowRight rotate the player.
+     * - ArrowUp/ArrowDown move the player forward/backward in the direction he's facing.
+     * - Space activates the jetpack (allowing upward movement).
+     *
+     * The player’s model is initially rotated so his back faces the camera.
+     * A corridor of 3dvr.tech billboards lies ahead along the Z‑axis.
+     * Win the level by reaching Z ≥ 200.
      */
 
     // GLOBAL VARIABLES
@@ -152,7 +156,7 @@
       ground.position.y = 0;
       scene.add(ground);
 
-      // Create a clear forward path of billboards (mostly along the Z-axis)
+      // Create a clear forward path of billboards (mostly along the Z‑axis)
       createPath();
 
       // Set up event listeners and mobile controls
@@ -165,31 +169,31 @@
       loadPlayer();
     }
 
-    // MOBILE CONTROLS – Map on‑screen buttons to key states
+    // MOBILE CONTROLS – Map on‑screen buttons to arrow key states
     function initMobileControls() {
       const leftBtn = document.getElementById("left-btn");
-      leftBtn.addEventListener("touchstart", e => { e.preventDefault(); keys["a"] = true; });
-      leftBtn.addEventListener("touchend", e => { e.preventDefault(); keys["a"] = false; });
-      leftBtn.addEventListener("mousedown", e => { e.preventDefault(); keys["a"] = true; });
-      leftBtn.addEventListener("mouseup", e => { e.preventDefault(); keys["a"] = false; });
+      leftBtn.addEventListener("touchstart", e => { e.preventDefault(); keys["ArrowLeft"] = true; });
+      leftBtn.addEventListener("touchend", e => { e.preventDefault(); keys["ArrowLeft"] = false; });
+      leftBtn.addEventListener("mousedown", e => { e.preventDefault(); keys["ArrowLeft"] = true; });
+      leftBtn.addEventListener("mouseup", e => { e.preventDefault(); keys["ArrowLeft"] = false; });
 
       const rightBtn = document.getElementById("right-btn");
-      rightBtn.addEventListener("touchstart", e => { e.preventDefault(); keys["d"] = true; });
-      rightBtn.addEventListener("touchend", e => { e.preventDefault(); keys["d"] = false; });
-      rightBtn.addEventListener("mousedown", e => { e.preventDefault(); keys["d"] = true; });
-      rightBtn.addEventListener("mouseup", e => { e.preventDefault(); keys["d"] = false; });
+      rightBtn.addEventListener("touchstart", e => { e.preventDefault(); keys["ArrowRight"] = true; });
+      rightBtn.addEventListener("touchend", e => { e.preventDefault(); keys["ArrowRight"] = false; });
+      rightBtn.addEventListener("mousedown", e => { e.preventDefault(); keys["ArrowRight"] = true; });
+      rightBtn.addEventListener("mouseup", e => { e.preventDefault(); keys["ArrowRight"] = false; });
 
       const upBtn = document.getElementById("up-btn");
-      upBtn.addEventListener("touchstart", e => { e.preventDefault(); keys["w"] = true; });
-      upBtn.addEventListener("touchend", e => { e.preventDefault(); keys["w"] = false; });
-      upBtn.addEventListener("mousedown", e => { e.preventDefault(); keys["w"] = true; });
-      upBtn.addEventListener("mouseup", e => { e.preventDefault(); keys["w"] = false; });
+      upBtn.addEventListener("touchstart", e => { e.preventDefault(); keys["ArrowUp"] = true; });
+      upBtn.addEventListener("touchend", e => { e.preventDefault(); keys["ArrowUp"] = false; });
+      upBtn.addEventListener("mousedown", e => { e.preventDefault(); keys["ArrowUp"] = true; });
+      upBtn.addEventListener("mouseup", e => { e.preventDefault(); keys["ArrowUp"] = false; });
 
       const downBtn = document.getElementById("down-btn");
-      downBtn.addEventListener("touchstart", e => { e.preventDefault(); keys["s"] = true; });
-      downBtn.addEventListener("touchend", e => { e.preventDefault(); keys["s"] = false; });
-      downBtn.addEventListener("mousedown", e => { e.preventDefault(); keys["s"] = true; });
-      downBtn.addEventListener("mouseup", e => { e.preventDefault(); keys["s"] = false; });
+      downBtn.addEventListener("touchstart", e => { e.preventDefault(); keys["ArrowDown"] = true; });
+      downBtn.addEventListener("touchend", e => { e.preventDefault(); keys["ArrowDown"] = false; });
+      downBtn.addEventListener("mousedown", e => { e.preventDefault(); keys["ArrowDown"] = true; });
+      downBtn.addEventListener("mouseup", e => { e.preventDefault(); keys["ArrowDown"] = false; });
 
       const flyBtn = document.getElementById("fly-btn");
       flyBtn.addEventListener("touchstart", e => { e.preventDefault(); keys[" "] = true; });
@@ -198,29 +202,29 @@
       flyBtn.addEventListener("mouseup", e => { e.preventDefault(); keys[" "] = false; });
     }
 
-    // KEY EVENT HANDLERS – Support both WASD and Arrow keys
+    // KEY EVENT HANDLERS – Only respond to Arrow keys (and Space)
     function onKeyDown(e) {
-      if (e.key === "w" || e.key === "ArrowUp") {
-        keys["w"] = true;
-      } else if (e.key === "s" || e.key === "ArrowDown") {
-        keys["s"] = true;
-      } else if (e.key === "a" || e.key === "ArrowLeft") {
-        keys["a"] = true;
-      } else if (e.key === "d" || e.key === "ArrowRight") {
-        keys["d"] = true;
+      if (e.key === "ArrowUp") {
+        keys["ArrowUp"] = true;
+      } else if (e.key === "ArrowDown") {
+        keys["ArrowDown"] = true;
+      } else if (e.key === "ArrowLeft") {
+        keys["ArrowLeft"] = true;
+      } else if (e.key === "ArrowRight") {
+        keys["ArrowRight"] = true;
       } else if (e.key === " " || e.key === "Spacebar") {
         keys[" "] = true;
       }
     }
     function onKeyUp(e) {
-      if (e.key === "w" || e.key === "ArrowUp") {
-        keys["w"] = false;
-      } else if (e.key === "s" || e.key === "ArrowDown") {
-        keys["s"] = false;
-      } else if (e.key === "a" || e.key === "ArrowLeft") {
-        keys["a"] = false;
-      } else if (e.key === "d" || e.key === "ArrowRight") {
-        keys["d"] = false;
+      if (e.key === "ArrowUp") {
+        keys["ArrowUp"] = false;
+      } else if (e.key === "ArrowDown") {
+        keys["ArrowDown"] = false;
+      } else if (e.key === "ArrowLeft") {
+        keys["ArrowLeft"] = false;
+      } else if (e.key === "ArrowRight") {
+        keys["ArrowRight"] = false;
       } else if (e.key === " " || e.key === "Spacebar") {
         keys[" "] = false;
       }
@@ -234,11 +238,11 @@
         function(gltf) {
           player = gltf.scene;
           player.scale.set(0.5, 0.5, 0.5);
-          // Start the player at ground level
+          // Start at ground level
           player.position.set(0, 1, 0);
-          // Rotate the player 180° so his back is initially toward the camera
+          // Rotate 180° so his back faces the camera
           player.rotation.y = Math.PI;
-          // Attach a jetpack flame (for takeoff)
+          // Attach a jetpack flame for takeoff
           const flameGeo = new THREE.ConeGeometry(0.2, 0.5, 8);
           const flameMat = new THREE.MeshBasicMaterial({ color: 0xffa500 });
           const flameMesh = new THREE.Mesh(flameGeo, flameMat);
@@ -247,7 +251,7 @@
           flameMesh.visible = false;
           flameMesh.name = "flame";
           player.add(flameMesh);
-          // Add a branding billboard above the player
+          // Add branding above the player
           addPlayerBranding();
           scene.add(player);
           animate();
@@ -315,7 +319,7 @@
     }
 
     // CREATE A CLEAR, FORWARD PATH OF BILLBOARDS
-    // The path runs mostly along the Z‑axis from z = 20 to z = 200 with a little lateral oscillation.
+    // The corridor runs mostly along the Z‑axis from z = 20 to z = 200.
     function createPath() {
       const numBoxes = 30;
       for (let i = 0; i < numBoxes; i++) {
@@ -332,7 +336,7 @@
     }
 
     // CREATE A HIT EFFECT AT THE GIVEN POSITION
-    // An expanding, fading ring to give visual feedback on collision.
+    // An expanding, fading ring for visual feedback.
     function createHitEffect(position) {
       const ringGeom = new THREE.RingGeometry(0.5, 0.6, 32);
       const ringMat = new THREE.MeshBasicMaterial({
@@ -395,32 +399,32 @@
     }
 
     // UPDATE PLAYER MOVEMENT AND CAMERA FOLLOWING
-    // The player rotates with A/D (or ArrowLeft/ArrowRight) and walks forward/backward with W/S (or ArrowUp/ArrowDown).
-    // When Space is held, the jetpack is engaged for upward movement; otherwise, the player remains on the ground.
+    // The player rotates with ArrowLeft/ArrowRight and moves forward/backward with ArrowUp/ArrowDown.
+    // Pressing Space engages the jetpack for upward movement; otherwise, the player stays on the ground (y = 1).
     function updatePlayer(delta) {
       if (!gameActive || !player) return;
       
-      // ROTATION (turning): Use keys "a" or "ArrowLeft" for left, "d" or "ArrowRight" for right.
-      if (keys["a"]) {
+      // ROTATION: Use ArrowLeft to turn left, ArrowRight to turn right.
+      if (keys["ArrowLeft"]) {
         player.rotation.y += rotationSpeed * delta;
       }
-      if (keys["d"]) {
+      if (keys["ArrowRight"]) {
         player.rotation.y -= rotationSpeed * delta;
       }
       
-      // FORWARD/BACKWARD movement: Calculate the forward vector from the player's current rotation.
+      // FORWARD/BACKWARD: Move in the direction the player is facing.
       let forward = new THREE.Vector3(0, 0, -1);
       forward.applyQuaternion(player.quaternion);
-      forward.y = 0; // keep movement horizontal
+      forward.y = 0; // restrict to horizontal movement
       forward.normalize();
-      if (keys["w"]) {
+      if (keys["ArrowUp"]) {
         player.position.addScaledVector(forward, moveSpeed * delta);
       }
-      if (keys["s"]) {
+      if (keys["ArrowDown"]) {
         player.position.addScaledVector(forward, -moveSpeed * delta);
       }
       
-      // JETPACK: If Space is pressed, move upward; otherwise, stay on the ground (y = 1).
+      // JETPACK: If Space is pressed, move upward; otherwise, lock to ground level (y = 1).
       if (keys[" "]) {
         player.position.y += jetpackSpeed * delta;
       } else {
@@ -448,7 +452,7 @@
       checkCollisions();
       checkWin();
       
-      // Update hit effects
+      // Update active hit effects
       for (let i = hitEffects.length - 1; i >= 0; i--) {
         const effect = hitEffects[i];
         const elapsed = clock.getElapsedTime() - effect.userData.startTime;
