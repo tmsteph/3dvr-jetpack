@@ -2,12 +2,29 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>3dvr.tech Jetpack Game – Arrow Keys Only (Back View)</title>
+  <title>3dvr.tech Jetpack Game – Arrow Keys Only (Back View with Loading)</title>
   <!-- Ensure proper scaling on mobile devices -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     /* Reset margins and hide scrollbars */
     body { margin: 0; overflow: hidden; }
+
+    /* Loading overlay styles */
+    #loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: sans-serif;
+      font-size: 24px;
+      z-index: 100;
+    }
 
     /* Minimal, modern HUD for score display */
     #hud {
@@ -74,14 +91,16 @@
   </style>
 </head>
 <body>
+  <!-- Loading overlay -->
+  <div id="loading">Loading...</div>
+
   <!-- HUD for score -->
   <div id="hud">Score: 0</div>
   <!-- Win message overlay -->
   <div id="winMessage">You Win!</div>
 
-  <!-- Mobile on‑screen controls -->
+  <!-- Mobile on‑screen controls (arrow keys) -->
   <div id="dpad">
-    <!-- Arrow buttons only -->
     <button id="up-btn">↑</button>
     <div>
       <button id="left-btn">←</button>
@@ -98,17 +117,16 @@
   <!-- All-in-one game code -->
   <script>
     /**
-     * 3dvr.tech Jetpack Game – Arrow Keys Only (Back View)
+     * 3dvr.tech Jetpack Game – Arrow Keys Only (Back View with Loading)
      *
-     * In this level you control a character using only the Arrow keys (and Space for jetpack).
-     * - ArrowLeft/ArrowRight rotate the player.
-     * - ArrowUp/ArrowDown move the player forward/backward in the direction he's facing.
-     * - Space activates the jetpack (allowing upward movement).
-     *
-     * A corridor of 3dvr.tech billboards is placed along the Z‑axis,
-     * and the win condition is met when the player's Z coordinate reaches 200.
-     *
-     * This version now sets the player's initial Y‑rotation to 0 so his back faces the camera.
+     * - You control the character with the Arrow keys (Space for jetpack).
+     *   * ArrowLeft/ArrowRight rotate the player.
+     *   * ArrowUp/ArrowDown move the player forward/backward in the direction he's facing.
+     *   * Space engages the jetpack (vertical thrust).
+     * - The player’s model is initially set so his back faces the camera.
+     * - A corridor of 3dvr.tech billboards is placed along the Z-axis.
+     * - The level is won when the player's Z coordinate reaches 200.
+     * - A loading overlay is displayed until the player model finishes loading.
      */
 
     // GLOBAL VARIABLES
@@ -117,10 +135,10 @@
     let playerVelocity = new THREE.Vector3();
     const keys = {}; // To track key states
     let score = 0;
-    let gameActive = true; // The game runs until win condition is met
-    const pathBillboards = []; // Array to store the path billboards
-    const hitEffects = [];     // Active hit effects
-    const winZ = 200;          // Win when player's Z coordinate reaches this value
+    let gameActive = true;
+    const pathBillboards = []; // Array for the path billboards
+    const hitEffects = [];     // Array for active hit effects
+    const winZ = 200;          // Win condition: player's Z >= 200
 
     // Collision threshold (for forgiving collisions)
     const COLLISION_THRESHOLD = 4; // Units
@@ -128,7 +146,9 @@
     // MOVEMENT CONSTANTS
     const rotationSpeed = 2;   // Radians per second for turning
     const moveSpeed = 5;       // Units per second for walking
-    const jetpackSpeed = 10;   // Units per second upward when jetpack is engaged
+    const jetpackSpeed = 10;   // Units per second upward when jetpack is active
+    const gravity = -9.8;      // Gravity (units per second squared)
+    const groundLevel = 1;     // y-coordinate of the ground
 
     // INITIALIZATION FUNCTION
     function init() {
@@ -157,20 +177,23 @@
       ground.position.y = 0;
       scene.add(ground);
 
-      // Create a clear forward path of billboards (mostly along the Z‑axis)
+      // Create a forward corridor of billboards along the Z-axis.
       createPath();
 
-      // Set up event listeners and mobile controls
+      // Set up event listeners and mobile controls.
       window.addEventListener('resize', onWindowResize, false);
       window.addEventListener('keydown', onKeyDown, false);
       window.addEventListener('keyup', onKeyUp, false);
       initMobileControls();
 
-      // Load the player model (or fallback)
+      // Start the animation loop immediately.
+      animate();
+
+      // Begin loading the player model.
       loadPlayer();
     }
 
-    // MOBILE CONTROLS – Map on‑screen buttons to Arrow key states
+    // MOBILE CONTROLS – Map on‑screen buttons to Arrow key states.
     function initMobileControls() {
       const leftBtn = document.getElementById("left-btn");
       leftBtn.addEventListener("touchstart", e => { e.preventDefault(); keys["ArrowLeft"] = true; });
@@ -203,7 +226,7 @@
       flyBtn.addEventListener("mouseup", e => { e.preventDefault(); keys[" "] = false; });
     }
 
-    // KEY EVENT HANDLERS – Only respond to Arrow keys (and Space)
+    // KEY EVENT HANDLERS – Only respond to Arrow keys (and Space).
     function onKeyDown(e) {
       if (e.key === "ArrowUp") {
         keys["ArrowUp"] = true;
@@ -231,7 +254,7 @@
       }
     }
 
-    // LOAD THE PLAYER MODEL (glTF) OR FALL BACK TO A SIMPLE SPHERE
+    // LOAD THE PLAYER MODEL (glTF) OR FALL BACK TO A SIMPLE SPHERE.
     function loadPlayer() {
       const loader = new THREE.GLTFLoader();
       loader.load(
@@ -239,12 +262,12 @@
         function(gltf) {
           player = gltf.scene;
           player.scale.set(0.5, 0.5, 0.5);
-          // Start the player at ground level
-          player.position.set(0, 1, 0);
-          // Set the player's rotation so his back faces the camera.
-          // (For this model, leaving rotation at 0 yields the desired result.)
+          // Start at ground level.
+          player.position.set(0, groundLevel, 0);
+          // Set rotation so his back faces the camera.
+          // For this model, leaving rotation at 0 yields the desired view.
           player.rotation.y = 0;
-          // Attach a jetpack flame for takeoff
+          // Attach a jetpack flame for takeoff.
           const flameGeo = new THREE.ConeGeometry(0.2, 0.5, 8);
           const flameMat = new THREE.MeshBasicMaterial({ color: 0xffa500 });
           const flameMesh = new THREE.Mesh(flameGeo, flameMat);
@@ -253,14 +276,16 @@
           flameMesh.visible = false;
           flameMesh.name = "flame";
           player.add(flameMesh);
-          // Add branding above the player
+          // Add branding above the player.
           addPlayerBranding();
           scene.add(player);
-          animate();
+          // Remove the loading overlay.
+          document.getElementById("loading").style.display = "none";
         },
         undefined,
         function(error) {
           console.error("Error loading model", error);
+          // Use a fallback simple red sphere.
           player = new THREE.Object3D();
           const bodyGeo = new THREE.SphereGeometry(0.5, 16, 16);
           const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
@@ -275,14 +300,15 @@
           flameMesh.name = "flame";
           player.add(flameMesh);
           addPlayerBranding();
-          player.position.set(0, 1, 0);
+          player.position.set(0, groundLevel, 0);
           scene.add(player);
-          animate();
+          // Remove the loading overlay even if model fails.
+          document.getElementById("loading").style.display = "none";
         }
       );
     }
 
-    // ADD A BRANDING BILLBOARD ABOVE THE PLAYER
+    // ADD A BRANDING BILLBOARD ABOVE THE PLAYER.
     function addPlayerBranding() {
       const branding = createBillboard("3dvr.tech");
       branding.scale.set(0.5, 0.5, 0.5);
@@ -291,20 +317,20 @@
       player.add(branding);
     }
 
-    // CREATE A BEAUTIFULLY STYLED BILLBOARD USING A CANVAS
+    // CREATE A BEAUTIFULLY STYLED BILLBOARD USING A CANVAS.
     function createBillboard(text) {
       const size = 256;
       const canvas = document.createElement('canvas');
       canvas.width = size;
       canvas.height = size;
       const ctx = canvas.getContext('2d');
-      // Create a radial gradient background in gold tones
+      // Create a radial gradient background in gold tones.
       const gradient = ctx.createRadialGradient(size/2, size/2, size/8, size/2, size/2, size/2);
       gradient.addColorStop(0, "#ffcc00");
       gradient.addColorStop(1, "#ff6600");
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, size, size);
-      // Draw bold, white text with a black stroke
+      // Draw bold, white text with a black stroke.
       ctx.font = "bold 50px Arial";
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
@@ -320,15 +346,15 @@
       return new THREE.Mesh(geometry, material);
     }
 
-    // CREATE A CLEAR, FORWARD PATH OF BILLBOARDS
+    // CREATE A CLEAR, FORWARD PATH OF BILLBOARDS.
     // The corridor runs mostly along the Z‑axis from z = 20 to z = 200.
     function createPath() {
       const numBoxes = 30;
       for (let i = 0; i < numBoxes; i++) {
         const t = i / (numBoxes - 1);
-        const z = 20 + t * 180; // Forward from 20 to 200
-        const x = 5 * Math.sin(2 * Math.PI * t); // Oscillation in X
-        const y = 2; // Slightly above ground
+        const z = 20 + t * 180; // Forward from 20 to 200.
+        const x = 5 * Math.sin(2 * Math.PI * t); // Oscillation in X.
+        const y = 2; // Slightly above ground.
         const billboard = createBillboard("3dvr.tech");
         billboard.scale.set(1, 1, 1);
         billboard.position.set(x, y, z);
@@ -337,7 +363,7 @@
       }
     }
 
-    // CREATE A HIT EFFECT AT THE GIVEN POSITION
+    // CREATE A HIT EFFECT AT THE GIVEN POSITION.
     // An expanding, fading ring for visual feedback.
     function createHitEffect(position) {
       const ringGeom = new THREE.RingGeometry(0.5, 0.6, 32);
@@ -350,14 +376,14 @@
       });
       const ring = new THREE.Mesh(ringGeom, ringMat);
       ring.position.copy(position);
-      ring.rotation.x = Math.PI / 2; // Lay horizontally
+      ring.rotation.x = Math.PI / 2; // Lay horizontally.
       ring.userData.startTime = clock.getElapsedTime();
       ring.userData.duration = 0.5;
       scene.add(ring);
       hitEffects.push(ring);
     }
 
-    // CHECK FOR COLLISIONS BETWEEN THE PLAYER AND PATH BILLBOARDS
+    // CHECK FOR COLLISIONS BETWEEN THE PLAYER AND PATH BILLBOARDS.
     // When a collision is detected, spawn a hit effect, remove the billboard, and award points.
     function checkCollisions() {
       if (!player) return;
@@ -388,7 +414,7 @@
       document.getElementById("winMessage").style.display = "block";
     }
 
-    // UPDATE THE HUD (Score display)
+    // UPDATE THE HUD (Score display).
     function updateHUD() {
       document.getElementById("hud").textContent = "Score: " + score;
     }
@@ -400,10 +426,10 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
-    // UPDATE PLAYER MOVEMENT AND CAMERA FOLLOWING
+    // UPDATE PLAYER MOVEMENT AND CAMERA FOLLOWING.
     // The player rotates with ArrowLeft/ArrowRight and moves forward/backward with ArrowUp/ArrowDown.
     // Pressing Space engages the jetpack for upward movement.
-    // Vertical motion uses a simple gravity integration for smooth landing.
+    // Vertical motion is handled smoothly using a simple gravity integration.
     function updatePlayer(delta) {
       if (!gameActive || !player) return;
       
@@ -415,13 +441,13 @@
         player.rotation.y -= rotationSpeed * delta;
       }
       
-      // HORIZONTAL movement: Compute forward vector from player's current rotation.
+      // HORIZONTAL movement: Compute the forward vector from the player's current rotation.
       let forward = new THREE.Vector3(0, 0, -1);
       forward.applyQuaternion(player.quaternion);
-      forward.y = 0; // keep movement horizontal
+      forward.y = 0; // Restrict to horizontal movement.
       forward.normalize();
       
-      // Move forward/backward
+      // Move forward/backward.
       if (keys["ArrowUp"]) {
         player.position.addScaledVector(forward, moveSpeed * delta);
       }
@@ -429,21 +455,20 @@
         player.position.addScaledVector(forward, -moveSpeed * delta);
       }
       
-      // VERTICAL movement: Use Space for jetpack thrust. Otherwise, apply gravity.
+      // VERTICAL movement: If Space is pressed, set vertical velocity to jetpack thrust;
+      // otherwise, apply gravity to the vertical velocity.
       if (keys[" "]) {
-        // Set vertical velocity to jetpack thrust.
         playerVelocity.y = jetpackSpeed;
       } else {
-        // Apply gravity to vertical velocity.
         playerVelocity.y += gravity * delta;
       }
       
-      // Update vertical position based on vertical velocity.
+      // Update vertical position.
       player.position.y += playerVelocity.y * delta;
       
-      // Clamp the player to the ground level if they fall too low.
-      if (player.position.y < 1) {
-        player.position.y = 1;
+      // Clamp the player to ground level.
+      if (player.position.y < groundLevel) {
+        player.position.y = groundLevel;
         playerVelocity.y = 0;
       }
       
@@ -453,8 +478,8 @@
       backward.applyQuaternion(player.quaternion);
       backward.y = 0;
       backward.normalize();
-      desiredCameraPos.addScaledVector(backward, 10); // 10 units behind
-      desiredCameraPos.y += 5; // 5 units above
+      desiredCameraPos.addScaledVector(backward, 10); // 10 units behind.
+      desiredCameraPos.y += 5; // 5 units above.
       camera.position.lerp(desiredCameraPos, 0.1);
       camera.lookAt(player.position);
     }
@@ -468,7 +493,7 @@
       checkCollisions();
       checkWin();
       
-      // Update active hit effects (expanding and fading)
+      // Update active hit effects.
       for (let i = hitEffects.length - 1; i >= 0; i--) {
         const effect = hitEffects[i];
         const elapsed = clock.getElapsedTime() - effect.userData.startTime;
@@ -484,6 +509,7 @@
       
       // Make the path billboards always face the camera.
       pathBillboards.forEach(b => b.lookAt(camera.position));
+      
       renderer.render(scene, camera);
     }
 
