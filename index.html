@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>3dvr.tech Jetpack Game – Arrow Key Controls</title>
+  <title>3dvr.tech Jetpack Game – Arrow Keys Only (Smooth Landing)</title>
   <!-- Ensure proper scaling on mobile devices -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
@@ -81,7 +81,7 @@
 
   <!-- Mobile on‑screen controls -->
   <div id="dpad">
-    <!-- We'll label the buttons with arrow symbols -->
+    <!-- Arrow buttons only -->
     <button id="up-btn">↑</button>
     <div>
       <button id="left-btn">←</button>
@@ -98,21 +98,24 @@
   <!-- All-in-one game code -->
   <script>
     /**
-     * 3dvr.tech Jetpack Game – Arrow Key Controls
+     * 3dvr.tech Jetpack Game – Arrow Keys Only (Smooth Landing)
      *
      * In this level you control a character using only the Arrow keys (and Space for jetpack).
      * - ArrowLeft/ArrowRight rotate the player.
      * - ArrowUp/ArrowDown move the player forward/backward in the direction he's facing.
-     * - Space activates the jetpack (allowing upward movement).
+     * - Space activates the jetpack (adding upward thrust).
      *
      * The player’s model is initially rotated so his back faces the camera.
-     * A corridor of 3dvr.tech billboards lies ahead along the Z‑axis.
-     * Win the level by reaching Z ≥ 200.
+     * A corridor of 3dvr.tech billboards is placed along the Z‑axis.
+     * The win condition is met when the player's Z coordinate reaches 200.
+     * Vertical movement is now integrated using a simple gravity simulation so that releasing the spacebar
+     * causes the player to land smoothly instead of snapping abruptly.
      */
 
     // GLOBAL VARIABLES
     let scene, camera, renderer, clock;
     let player; // The player object (a glTF model or fallback)
+    // We'll use playerVelocity as a full 3D velocity vector (including y)
     let playerVelocity = new THREE.Vector3();
     const keys = {}; // To track key states
     let score = 0;
@@ -127,7 +130,9 @@
     // MOVEMENT CONSTANTS
     const rotationSpeed = 2;   // Radians per second for turning
     const moveSpeed = 5;       // Units per second for walking
-    const jetpackSpeed = 10;   // Units per second upward when jetpack is engaged
+    const jetpackThrust = 10;  // Upward units per second when jetpack is active
+    const gravity = -9.8;      // Gravity acceleration (units per second squared)
+    const groundLevel = 1;     // y-coordinate of the ground
 
     // INITIALIZATION FUNCTION
     function init() {
@@ -169,7 +174,7 @@
       loadPlayer();
     }
 
-    // MOBILE CONTROLS – Map on‑screen buttons to arrow key states
+    // MOBILE CONTROLS – Map on‑screen buttons to Arrow key states
     function initMobileControls() {
       const leftBtn = document.getElementById("left-btn");
       leftBtn.addEventListener("touchstart", e => { e.preventDefault(); keys["ArrowLeft"] = true; });
@@ -239,7 +244,7 @@
           player = gltf.scene;
           player.scale.set(0.5, 0.5, 0.5);
           // Start at ground level
-          player.position.set(0, 1, 0);
+          player.position.set(0, groundLevel, 0);
           // Rotate 180° so his back faces the camera
           player.rotation.y = Math.PI;
           // Attach a jetpack flame for takeoff
@@ -273,7 +278,7 @@
           flameMesh.name = "flame";
           player.add(flameMesh);
           addPlayerBranding();
-          player.position.set(0, 1, 0);
+          player.position.set(0, groundLevel, 0);
           scene.add(player);
           animate();
         }
@@ -400,7 +405,8 @@
 
     // UPDATE PLAYER MOVEMENT AND CAMERA FOLLOWING
     // The player rotates with ArrowLeft/ArrowRight and moves forward/backward with ArrowUp/ArrowDown.
-    // Pressing Space engages the jetpack for upward movement; otherwise, the player stays on the ground (y = 1).
+    // Pressing Space engages the jetpack for upward movement. Vertical motion is handled smoothly:
+    // If Space is pressed, the vertical velocity is set to a positive value; otherwise, gravity is applied.
     function updatePlayer(delta) {
       if (!gameActive || !player) return;
       
@@ -412,11 +418,13 @@
         player.rotation.y -= rotationSpeed * delta;
       }
       
-      // FORWARD/BACKWARD: Move in the direction the player is facing.
+      // HORIZONTAL movement: Compute forward vector from player's current rotation.
       let forward = new THREE.Vector3(0, 0, -1);
       forward.applyQuaternion(player.quaternion);
-      forward.y = 0; // restrict to horizontal movement
+      forward.y = 0; // keep movement horizontal
       forward.normalize();
+      
+      // Move forward/backward
       if (keys["ArrowUp"]) {
         player.position.addScaledVector(forward, moveSpeed * delta);
       }
@@ -424,14 +432,25 @@
         player.position.addScaledVector(forward, -moveSpeed * delta);
       }
       
-      // JETPACK: If Space is pressed, move upward; otherwise, lock to ground level (y = 1).
+      // VERTICAL movement: Use Space to engage the jetpack.
       if (keys[" "]) {
-        player.position.y += jetpackSpeed * delta;
+        // When Space is pressed, set vertical velocity to jetpackThrust.
+        playerVelocity.y = jetpackThrust;
       } else {
-        player.position.y = 1;
+        // Otherwise, apply gravity to the vertical velocity.
+        playerVelocity.y += gravity * delta;
       }
       
-      // Update camera: Position the camera behind and above the player.
+      // Update vertical position using the vertical velocity.
+      player.position.y += playerVelocity.y * delta;
+      
+      // If the player falls below the ground, clamp to ground level and reset vertical velocity.
+      if (player.position.y < groundLevel) {
+        player.position.y = groundLevel;
+        playerVelocity.y = 0;
+      }
+      
+      // Update the camera: position it behind and above the player.
       let desiredCameraPos = new THREE.Vector3().copy(player.position);
       let backward = new THREE.Vector3(0, 0, 1);
       backward.applyQuaternion(player.quaternion);
@@ -452,7 +471,7 @@
       checkCollisions();
       checkWin();
       
-      // Update active hit effects
+      // Update active hit effects (expanding and fading)
       for (let i = hitEffects.length - 1; i >= 0; i--) {
         const effect = hitEffects[i];
         const elapsed = clock.getElapsedTime() - effect.userData.startTime;
@@ -466,8 +485,9 @@
         }
       }
       
-      // Make the path billboards always face the camera
+      // Make the path billboards always face the camera.
       pathBillboards.forEach(b => b.lookAt(camera.position));
+      
       renderer.render(scene, camera);
     }
 
