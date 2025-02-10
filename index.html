@@ -9,7 +9,7 @@
     /* Remove default margins and hide scrollbars */
     body { margin: 0; overflow: hidden; }
 
-    /* Mobile control styling */
+    /* Mobile on-screen controls */
     #dpad {
       position: fixed;
       bottom: 20px;
@@ -19,7 +19,7 @@
       align-items: center;
       z-index: 10;
     }
-    /* Row for left, down, right buttons */
+    /* A row for left, down, right buttons */
     #dpad > div {
       display: flex;
       justify-content: center;
@@ -55,47 +55,40 @@
 
   <!-- Load Three.js from a CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <!-- Load the GLTFLoader for model loading -->
+  <!-- Load GLTFLoader to import our 3D model -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 
   <!-- All-in-one game code -->
   <script>
-    // === GLOBAL VARIABLES ===
+    // GLOBAL VARIABLES
     let scene, camera, renderer, clock;
     let player, playerVelocity;
-    let billboards = [];  // Array for 3dvr.tech billboards
-    const keys = {};     // Object to track key states
+    let billboards = [];  // Array for floating 3dvr.tech billboards
+    const keys = {};     // For keyboard/mobile button tracking
 
-    // Physics and control constants
+    // Physics/Control Constants
     const GRAVITY    = new THREE.Vector3(0, -9.8, 0);
     const THRUST     = 20;
     const MOVE_ACCEL = 10;
     const MAX_SPEED  = 50;
 
-    // === INITIALIZATION FUNCTION ===
+    // INITIALIZATION
     function init() {
-      // Create the scene with a sky-blue background
+      // Create the scene and camera
       scene = new THREE.Scene();
       scene.background = new THREE.Color(0x87ceeb);
-
-      // Create the camera
       camera = new THREE.PerspectiveCamera(
-        75,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        1000
+        75, window.innerWidth / window.innerHeight, 0.1, 1000
       );
       camera.position.set(0, 5, 15);
 
-      // Create the renderer and add its canvas to the document
+      // Create renderer and clock
       renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
       document.body.appendChild(renderer.domElement);
-
-      // Set up a clock for delta timing
       clock = new THREE.Clock();
 
-      // Add ambient and directional lights
+      // Add lighting
       const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
       scene.add(ambientLight);
       const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -110,52 +103,52 @@
       ground.position.y = 0;
       scene.add(ground);
 
-      // Add branded billboards throughout the scene
+      // Add some 3dvr.tech billboards, a fun path, and extra decorations
       addBrandBillboards();
+      createFunPath();
+      addExtraDecorations();
 
-      // Set up event listeners for window resize and keyboard input
+      // Setup event listeners
       window.addEventListener('resize', onWindowResize, false);
       window.addEventListener('keydown', onKeyDown, false);
       window.addEventListener('keyup', onKeyUp, false);
-
-      // Initialize the mobile control buttons
       initMobileControls();
 
-      // Load the improved player model
+      // Load the player model (or fallback)
       loadPlayer();
     }
 
-    // === INIT MOBILE CONTROLS ===
+    // MOBILE CONTROLS (on-screen buttons)
     function initMobileControls() {
-      // Left button (simulate key "a")
+      // Left button (simulate "a")
       let leftBtn = document.getElementById("left-btn");
       leftBtn.addEventListener("touchstart", e => { e.preventDefault(); keys["a"] = true; });
       leftBtn.addEventListener("touchend", e => { e.preventDefault(); keys["a"] = false; });
       leftBtn.addEventListener("mousedown", e => { e.preventDefault(); keys["a"] = true; });
       leftBtn.addEventListener("mouseup", e => { e.preventDefault(); keys["a"] = false; });
 
-      // Right button (simulate key "d")
+      // Right button (simulate "d")
       let rightBtn = document.getElementById("right-btn");
       rightBtn.addEventListener("touchstart", e => { e.preventDefault(); keys["d"] = true; });
       rightBtn.addEventListener("touchend", e => { e.preventDefault(); keys["d"] = false; });
       rightBtn.addEventListener("mousedown", e => { e.preventDefault(); keys["d"] = true; });
       rightBtn.addEventListener("mouseup", e => { e.preventDefault(); keys["d"] = false; });
 
-      // Up button (simulate key "w")
+      // Up button (simulate "w")
       let upBtn = document.getElementById("up-btn");
       upBtn.addEventListener("touchstart", e => { e.preventDefault(); keys["w"] = true; });
       upBtn.addEventListener("touchend", e => { e.preventDefault(); keys["w"] = false; });
       upBtn.addEventListener("mousedown", e => { e.preventDefault(); keys["w"] = true; });
       upBtn.addEventListener("mouseup", e => { e.preventDefault(); keys["w"] = false; });
 
-      // Down button (simulate key "s")
+      // Down button (simulate "s")
       let downBtn = document.getElementById("down-btn");
       downBtn.addEventListener("touchstart", e => { e.preventDefault(); keys["s"] = true; });
       downBtn.addEventListener("touchend", e => { e.preventDefault(); keys["s"] = false; });
       downBtn.addEventListener("mousedown", e => { e.preventDefault(); keys["s"] = true; });
       downBtn.addEventListener("mouseup", e => { e.preventDefault(); keys["s"] = false; });
 
-      // Fly button (simulate space key for jetpack thrust)
+      // Fly button (simulate "space" for jetpack thrust)
       let flyBtn = document.getElementById("fly-btn");
       flyBtn.addEventListener("touchstart", e => { e.preventDefault(); keys[" "] = true; });
       flyBtn.addEventListener("touchend", e => { e.preventDefault(); keys[" "] = false; });
@@ -163,7 +156,7 @@
       flyBtn.addEventListener("mouseup", e => { e.preventDefault(); keys[" "] = false; });
     }
 
-    // === LOAD PLAYER MODEL (GLTF) ===
+    // LOAD PLAYER MODEL (GLTF) OR FALLBACK
     function loadPlayer() {
       const loader = new THREE.GLTFLoader();
       loader.load(
@@ -172,29 +165,27 @@
           player = gltf.scene;
           player.scale.set(0.5, 0.5, 0.5);
           player.position.set(0, 2, 0);
-          // Add a jetpack flame (a small cone) to the model
+          // Attach a jetpack flame to the model
           const flameGeometry = new THREE.ConeGeometry(0.2, 0.5, 8);
           const flameMaterial = new THREE.MeshBasicMaterial({ color: 0xffa500 });
           const flameMesh = new THREE.Mesh(flameGeometry, flameMaterial);
           flameMesh.position.set(0, -0.8, 0);
-          flameMesh.rotation.x = Math.PI; // Points downward
+          flameMesh.rotation.x = Math.PI;
           flameMesh.visible = false;
           flameMesh.name = "flame";
           player.add(flameMesh);
 
-          // Add a small 3dvr.tech branding above the player
+          // Add a small branding billboard above the model
           addPlayerBranding();
 
-          // Add the player model to the scene and initialize its velocity
           scene.add(player);
           playerVelocity = new THREE.Vector3();
-          // Start the render loop after the model loads
           animate();
         },
         undefined,
         function(error) {
           console.error('Error loading glTF model', error);
-          // Fallback: create a simple red sphere if the model fails to load
+          // Fallback: a simple red sphere with a flame
           player = new THREE.Object3D();
           const bodyGeometry = new THREE.SphereGeometry(0.5, 16, 16);
           const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
@@ -219,7 +210,7 @@
       );
     }
 
-    // === PLAYER BRANDING ===
+    // ADD A BILLBOARD TO THE PLAYER (for branding)
     function addPlayerBranding() {
       const branding = createBillboard("3dvr.tech");
       branding.scale.set(0.5, 0.5, 0.5);
@@ -228,7 +219,7 @@
       player.add(branding);
     }
 
-    // === BRANDING BILLBOARDS ===
+    // CREATE A SET OF FLOATING BILLBOARDS (pre-existing decorations)
     function addBrandBillboards() {
       const billboardPositions = [
         { x: 10,  y: 5, z: -20 },
@@ -246,7 +237,7 @@
       });
     }
 
-    // === CREATE BILLBOARD FUNCTION ===
+    // CREATE A BILLBOARD MESH FROM A TEXT CANVAS
     function createBillboard(text) {
       const canvas = document.createElement('canvas');
       const size = 256;
@@ -271,7 +262,58 @@
       return new THREE.Mesh(geometry, material);
     }
 
-    // === EVENT HANDLERS ===
+    // CREATE A FUN PATH OF RING MARKERS ALONG A CURVED TRAJECTORY
+    function createFunPath() {
+      // Define control points for our path
+      const pathPoints = [
+        new THREE.Vector3(-30, 5, -30),
+        new THREE.Vector3(-10, 7, -10),
+        new THREE.Vector3(0, 5, 0),
+        new THREE.Vector3(10, 7, 10),
+        new THREE.Vector3(30, 5, 30)
+      ];
+      const curve = new THREE.CatmullRomCurve3(pathPoints);
+      const points = curve.getPoints(100);
+      for (let i = 0; i < points.length; i++) {
+        const t = i / (points.length - 1);
+        const pos = points[i];
+        const tangent = curve.getTangent(t);
+        // Create a torus marker (ring)
+        const torusGeom = new THREE.TorusGeometry(2, 0.2, 16, 100);
+        const torusMat = new THREE.MeshStandardMaterial({ color: 0x0000ff, emissive: 0x3333ff });
+        const torus = new THREE.Mesh(torusGeom, torusMat);
+        torus.position.copy(pos);
+        // Align the torus so that its normal (default: (0,0,1)) matches the path tangent
+        let quaternion = new THREE.Quaternion();
+        quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+        torus.quaternion.copy(quaternion);
+        scene.add(torus);
+      }
+    }
+
+    // ADD EXTRA DECORATIVE OBJECTS ALONG THE PATH
+    function addExtraDecorations() {
+      const decorationPositions = [
+        new THREE.Vector3(-20, 3, -20),
+        new THREE.Vector3(0, 3, 0),
+        new THREE.Vector3(20, 3, 20)
+      ];
+      decorationPositions.forEach(pos => {
+        // Create a decorative sphere
+        const sphereGeom = new THREE.SphereGeometry(1, 16, 16);
+        const sphereMat = new THREE.MeshStandardMaterial({ color: 0xff00ff, emissive: 0x330033 });
+        const sphere = new THREE.Mesh(sphereGeom, sphereMat);
+        sphere.position.copy(pos);
+        // Add a small billboard on top of the sphere
+        const billboard = createBillboard("3dvr.tech");
+        billboard.scale.set(0.5, 0.5, 0.5);
+        billboard.position.set(0, 2, 0);
+        sphere.add(billboard);
+        scene.add(sphere);
+      });
+    }
+
+    // EVENT HANDLERS
     function onWindowResize() {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
@@ -284,24 +326,21 @@
       keys[e.key] = false;
     }
 
-    // === ANIMATION LOOP ===
+    // ANIMATION LOOP
     function animate() {
       requestAnimationFrame(animate);
       const delta = clock.getDelta();
       updatePlayer(delta);
-      // Ensure billboards always face the camera
+      // Make billboards always face the camera
       billboards.forEach(billboard => {
         billboard.lookAt(camera.position);
       });
       renderer.render(scene, camera);
     }
 
-    // === UPDATE PLAYER MOVEMENT ===
+    // UPDATE PLAYER MOVEMENT
     function updatePlayer(delta) {
-      // Start with gravity
       let acceleration = new THREE.Vector3().copy(GRAVITY);
-
-      // Apply jetpack thrust if the space key is active
       if (keys[" "] || keys["Spacebar"]) {
         acceleration.y += THRUST;
         const flame = player.getObjectByName("flame");
@@ -310,8 +349,6 @@
         const flame = player.getObjectByName("flame");
         if (flame) flame.visible = false;
       }
-
-      // Lateral movement via keyboard or mobile buttons
       if (keys["w"] || keys["W"] || keys["ArrowUp"]) {
         acceleration.z -= MOVE_ACCEL;
       }
@@ -324,25 +361,17 @@
       if (keys["d"] || keys["D"] || keys["ArrowRight"]) {
         acceleration.x += MOVE_ACCEL;
       }
-
-      // Update the player's velocity
       playerVelocity.addScaledVector(acceleration, delta);
       if (playerVelocity.length() > MAX_SPEED) {
         playerVelocity.setLength(MAX_SPEED);
       }
       player.position.addScaledVector(playerVelocity, delta);
-
-      // Prevent the player from falling below a minimum height (ground collision)
       const minHeight = 1;
       if (player.position.y < minHeight) {
         player.position.y = minHeight;
         playerVelocity.y = 0;
       }
-
-      // Apply damping for smoother movement
       playerVelocity.multiplyScalar(0.99);
-
-      // Smoothly move the camera to follow the player
       const desiredCameraPos = new THREE.Vector3(
         player.position.x,
         player.position.y + 5,
@@ -352,7 +381,7 @@
       camera.lookAt(player.position);
     }
 
-    // === START THE GAME ===
+    // START THE GAME
     init();
   </script>
 </body>
