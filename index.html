@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>3dvr.tech Jetpack Game – Spiral Ascension with Hit Effects</title>
+  <title>3dvr.tech Jetpack Game – Spiral Ascension with Forgiving Collisions</title>
   <!-- Ensure proper scaling on mobile devices -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
@@ -97,11 +97,12 @@
   <!-- All-in-one game code -->
   <script>
     /**
-     * 3dvr.tech Jetpack Game – Spiral Ascension with Hit Effects
+     * 3dvr.tech Jetpack Game – Spiral Ascension with Forgiving Collisions
      *
      * In this level a helix (spiral) of beautifully styled 3dvr.tech billboards
      * guides the player upward into the sky. When you fly through a billboard,
      * an expanding ring effect appears to give immediate visual feedback.
+     * The collision threshold has been increased to make it easier to hit billboards.
      * Reach the top to win!
      */
 
@@ -114,6 +115,9 @@
     const pathBillboards = []; // Billboards forming the spiral path
     const winHeight = 100;    // Height at which the level is won
     const hitEffects = [];    // Array to hold active hit effects
+
+    // New: Collision threshold is now more forgiving.
+    const COLLISION_THRESHOLD = 3;  // Increased from 2 to 3 units
 
     // PHYSICS & CONTROL CONSTANTS
     const GRAVITY = new THREE.Vector3(0, -9.8, 0);
@@ -321,15 +325,15 @@
     }
 
     // CHECK FOR COLLISIONS BETWEEN THE PLAYER AND PATH BILLBOARDS
-    // When a collision is detected, a hit effect is spawned, the billboard is removed,
-    // and the player is awarded points.
+    // When a collision is detected, spawn a hit effect, remove the billboard,
+    // and award points.
     function checkCollisions() {
       if (!player) return;
       const playerPos = player.position;
       for (let i = pathBillboards.length - 1; i >= 0; i--) {
         const billboard = pathBillboards[i];
         const distance = playerPos.distanceTo(billboard.position);
-        if (distance < 2) { // Collision threshold
+        if (distance < COLLISION_THRESHOLD) { // More forgiving collision threshold
           createHitEffect(billboard.position);
           scene.remove(billboard);
           pathBillboards.splice(i, 1);
