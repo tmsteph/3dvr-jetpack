@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>3dvr.tech Jetpack Game – Spiral Ascension with Forgiving Collisions</title>
+  <title>3dvr.tech Jetpack Game – Creative Ascension</title>
   <!-- Ensure proper scaling on mobile devices -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
@@ -97,27 +97,26 @@
   <!-- All-in-one game code -->
   <script>
     /**
-     * 3dvr.tech Jetpack Game – Spiral Ascension with Forgiving Collisions
+     * 3dvr.tech Jetpack Game – Creative Ascension
      *
-     * In this level a helix (spiral) of beautifully styled 3dvr.tech billboards
-     * guides the player upward into the sky. When you fly through a billboard,
-     * an expanding ring effect appears to give immediate visual feedback.
-     * The collision threshold has been increased to make it easier to hit billboards.
-     * Reach the top to win!
+     * In this level a creatively designed path of beautifully styled 3dvr.tech billboards
+     * guides the player upward while moving forward. The path features loops and oscillations,
+     * making it fun and challenging to follow. When you fly through a billboard, an expanding
+     * ring hit effect appears. Reach near the top (vertical win height) to win!
      */
 
     // GLOBAL VARIABLES
     let scene, camera, renderer, clock;
     let player, playerVelocity;
-    const keys = {};          // For keyboard & mobile control states
+    const keys = {};           // For keyboard & mobile control states
     let score = 0;
-    let gameActive = true;    // Game runs until win condition
-    const pathBillboards = []; // Billboards forming the spiral path
-    const winHeight = 100;    // Height at which the level is won
-    const hitEffects = [];    // Array to hold active hit effects
+    let gameActive = true;     // Game runs until win condition
+    const pathBillboards = []; // Billboards forming the creative path
+    const winHeight = 100;     // Height at which the level is won
+    const hitEffects = [];     // Array to hold active hit effects
 
-    // New: Collision threshold is now more forgiving.
-    const COLLISION_THRESHOLD = 3;  // Increased from 2 to 3 units
+    // Collision threshold (for forgiving collisions)
+    const COLLISION_THRESHOLD = 3; // Increased from 2 to 3 units
 
     // PHYSICS & CONTROL CONSTANTS
     const GRAVITY = new THREE.Vector3(0, -9.8, 0);
@@ -152,7 +151,7 @@
       ground.position.y = 0;
       scene.add(ground);
 
-      // Create the upward‑spiraling path of billboards
+      // Create the creative, forward‑moving path of billboards
       createSpiralPath();
 
       // Set up event listeners and mobile controls
@@ -285,16 +284,22 @@
       return new THREE.Mesh(geometry, material);
     }
 
-    // CREATE A SPIRAL PATH (HELIX) OF BILLBOARDS THAT ASCENDS INTO THE SKY
+    // CREATE A CREATIVE SPIRAL PATH (HELIX) OF BILLBOARDS THAT MOVES FORWARD
+    // This path moves forward along the X‑axis while ascending, and adds extra loops
+    // and oscillations in the Y and Z directions to create a fun, dynamic route.
     function createSpiralPath() {
-      const numBillboards = 30;
-      const spiralRadius = 5;  // Constant radius of the helix
+      const numBillboards = 40;
+      const spiralRadius = 5;  // Base radius of the spiral
       for (let i = 0; i < numBillboards; i++) {
-        const t = i / (numBillboards - 1);
-        const theta = t * (4 * Math.PI); // 4 full rotations
-        const y = t * winHeight;         // Y goes from 0 to winHeight
-        const x = spiralRadius * Math.cos(theta);
-        const z = spiralRadius * Math.sin(theta);
+        let t = i / (numBillboards - 1);  // t ranges from 0 to 1
+        // Use 4 full rotations over the course of the path
+        let theta = 4 * Math.PI * t;
+        // Forward movement: a linear offset in the X direction
+        let forwardOffset = 20 * t;
+        // Compute X, Y, Z with extra oscillatory terms for loops and creativity:
+        let x = forwardOffset + spiralRadius * Math.cos(theta);
+        let y = winHeight * t + 2 * Math.sin(4 * Math.PI * t);
+        let z = spiralRadius * Math.sin(theta) + 2 * Math.cos(4 * Math.PI * t);
         const billboard = createBillboard("3dvr.tech");
         billboard.scale.set(1, 1, 1);
         billboard.position.set(x, y, z);
@@ -333,7 +338,7 @@
       for (let i = pathBillboards.length - 1; i >= 0; i--) {
         const billboard = pathBillboards[i];
         const distance = playerPos.distanceTo(billboard.position);
-        if (distance < COLLISION_THRESHOLD) { // More forgiving collision threshold
+        if (distance < COLLISION_THRESHOLD) { // Forgiving collision threshold
           createHitEffect(billboard.position);
           scene.remove(billboard);
           pathBillboards.splice(i, 1);
@@ -393,7 +398,7 @@
         }
       }
 
-      // Make the spiral path billboards always face the camera
+      // Make the path billboards always face the camera
       pathBillboards.forEach(b => b.lookAt(camera.position));
       renderer.render(scene, camera);
     }
