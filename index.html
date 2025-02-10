@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>3dvr.tech Jetpack Game – Spiral Ascension</title>
+  <title>3dvr.tech Jetpack Game – Spiral Ascension with Hit Effects</title>
   <!-- Ensure proper scaling on mobile devices -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
@@ -97,21 +97,23 @@
   <!-- All-in-one game code -->
   <script>
     /**
-     * 3dvr.tech Jetpack Game – Spiral Ascension
+     * 3dvr.tech Jetpack Game – Spiral Ascension with Hit Effects
      *
      * In this level a helix (spiral) of beautifully styled 3dvr.tech billboards
-     * guides the player upward into the sky. Follow the clear, upward‑spiraling path
-     * and reach the top to win the level!
+     * guides the player upward into the sky. When you fly through a billboard,
+     * an expanding ring effect appears to give immediate visual feedback.
+     * Reach the top to win!
      */
 
     // GLOBAL VARIABLES
     let scene, camera, renderer, clock;
     let player, playerVelocity;
-    const keys = {};          // Track keyboard & mobile control states
+    const keys = {};          // For keyboard & mobile control states
     let score = 0;
-    let gameActive = true;    // Game is active until win condition is met
-    const pathBillboards = []; // Array holding the spiral path billboards
-    const winHeight = 100;    // Y-value at which the level is won
+    let gameActive = true;    // Game runs until win condition
+    const pathBillboards = []; // Billboards forming the spiral path
+    const winHeight = 100;    // Height at which the level is won
+    const hitEffects = [];    // Array to hold active hit effects
 
     // PHYSICS & CONTROL CONSTANTS
     const GRAVITY = new THREE.Vector3(0, -9.8, 0);
@@ -121,7 +123,7 @@
 
     // INITIALIZATION FUNCTION
     function init() {
-      // Set up the scene, camera, renderer, and clock
+      // Set up scene, camera, renderer, and clock
       scene = new THREE.Scene();
       scene.background = new THREE.Color(0x87ceeb);
       camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -131,7 +133,7 @@
       document.body.appendChild(renderer.domElement);
       clock = new THREE.Clock();
 
-      // Add ambient and directional lighting
+      // Add ambient and directional lights
       const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
       scene.add(ambientLight);
       const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -146,7 +148,7 @@
       ground.position.y = 0;
       scene.add(ground);
 
-      // Create a clear, upward‑spiraling path of billboards
+      // Create the upward‑spiraling path of billboards
       createSpiralPath();
 
       // Set up event listeners and mobile controls
@@ -257,13 +259,13 @@
       canvas.width = size;
       canvas.height = size;
       const ctx = canvas.getContext('2d');
-      // Create a radial gradient background (gold tones)
+      // Create a radial gradient background in gold tones
       const gradient = ctx.createRadialGradient(size/2, size/2, size/8, size/2, size/2, size/2);
       gradient.addColorStop(0, "#ffcc00");
       gradient.addColorStop(1, "#ff6600");
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, size, size);
-      // Draw the text in bold white with a black stroke
+      // Draw bold, white text with a black stroke
       ctx.font = "bold 50px Arial";
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
@@ -282,7 +284,7 @@
     // CREATE A SPIRAL PATH (HELIX) OF BILLBOARDS THAT ASCENDS INTO THE SKY
     function createSpiralPath() {
       const numBillboards = 30;
-      const spiralRadius = 5;  // constant radius of the helix
+      const spiralRadius = 5;  // Constant radius of the helix
       for (let i = 0; i < numBillboards; i++) {
         const t = i / (numBillboards - 1);
         const theta = t * (4 * Math.PI); // 4 full rotations
@@ -297,15 +299,38 @@
       }
     }
 
+    // CREATE A HIT EFFECT AT THE GIVEN POSITION
+    // An expanding, fading ring to give visual feedback on collision.
+    function createHitEffect(position) {
+      const ringGeom = new THREE.RingGeometry(0.5, 0.6, 32);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 1,
+        blending: THREE.AdditiveBlending
+      });
+      const ring = new THREE.Mesh(ringGeom, ringMat);
+      ring.position.copy(position);
+      // Orient the ring so it lies horizontally
+      ring.rotation.x = Math.PI / 2;
+      ring.userData.startTime = clock.getElapsedTime();
+      ring.userData.duration = 0.5;
+      scene.add(ring);
+      hitEffects.push(ring);
+    }
+
     // CHECK FOR COLLISIONS BETWEEN THE PLAYER AND PATH BILLBOARDS
-    // (Award points and remove the billboard when the player “hits” it.)
+    // When a collision is detected, a hit effect is spawned, the billboard is removed,
+    // and the player is awarded points.
     function checkCollisions() {
       if (!player) return;
       const playerPos = player.position;
       for (let i = pathBillboards.length - 1; i >= 0; i--) {
         const billboard = pathBillboards[i];
         const distance = playerPos.distanceTo(billboard.position);
-        if (distance < 2) { // collision threshold
+        if (distance < 2) { // Collision threshold
+          createHitEffect(billboard.position);
           scene.remove(billboard);
           pathBillboards.splice(i, 1);
           score += 10;
@@ -314,7 +339,7 @@
       }
     }
 
-    // CHECK THE WIN CONDITION – Has the player reached the top?
+    // CHECK THE WIN CONDITION – Has the player reached near the top?
     function checkWin() {
       if (player && player.position.y >= winHeight - 2 && gameActive) {
         winLevel();
@@ -349,7 +374,22 @@
       updatePlayer(delta);
       checkCollisions();
       checkWin();
-      // Ensure the spiral path billboards always face the camera
+
+      // Update active hit effects
+      for (let i = hitEffects.length - 1; i >= 0; i--) {
+        const effect = hitEffects[i];
+        const elapsed = clock.getElapsedTime() - effect.userData.startTime;
+        const t = elapsed / effect.userData.duration;
+        if (t >= 1) {
+          scene.remove(effect);
+          hitEffects.splice(i, 1);
+        } else {
+          effect.scale.setScalar(1 + t * 2);  // Expand the ring
+          effect.material.opacity = 1 - t;     // Fade out the ring
+        }
+      }
+
+      // Make the spiral path billboards always face the camera
       pathBillboards.forEach(b => b.lookAt(camera.position));
       renderer.render(scene, camera);
     }
