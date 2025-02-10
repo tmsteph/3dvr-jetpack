@@ -2,25 +2,40 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>3dvr.tech Jetpack Game – Sacred Level</title>
+  <title>3dvr.tech Jetpack Game – Spiral Ascension</title>
   <!-- Ensure proper scaling on mobile devices -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     /* Reset margins and hide scrollbars */
     body { margin: 0; overflow: hidden; }
 
-    /* Minimal, modern HUD for score & instructions */
+    /* Minimal, modern HUD for score display */
     #hud {
       position: fixed;
       top: 10px;
       left: 10px;
-      background: rgba(0, 0, 0, 0.6);
+      background: rgba(0,0,0,0.6);
       color: #fff;
       padding: 8px 12px;
       border-radius: 8px;
       font-family: sans-serif;
       font-size: 16px;
       z-index: 20;
+    }
+
+    /* Win message overlay */
+    #winMessage {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.8);
+      color: #fff;
+      padding: 20px 40px;
+      font-size: 36px;
+      border-radius: 10px;
+      z-index: 30;
+      display: none;
     }
 
     /* Mobile on‑screen controls styling */
@@ -46,7 +61,7 @@
       opacity: 0.8;
       border: none;
       border-radius: 8px;
-      background: rgba(0, 0, 0, 0.5);
+      background: rgba(0,0,0,0.5);
       color: #fff;
     }
     /* Fly button at bottom-right */
@@ -61,6 +76,8 @@
 <body>
   <!-- HUD for score -->
   <div id="hud">Score: 0</div>
+  <!-- Win message overlay (hidden until win condition is met) -->
+  <div id="winMessage">You Win!</div>
 
   <!-- Mobile on‑screen controls -->
   <div id="dpad">
@@ -73,38 +90,38 @@
   </div>
   <button id="fly-btn">Fly</button>
 
-  <!-- Load Three.js and GLTFLoader -->
+  <!-- Load Three.js and GLTFLoader from CDNs -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 
   <!-- All-in-one game code -->
   <script>
     /**
-     * 3dvr.tech Jetpack Game – Sacred Level
+     * 3dvr.tech Jetpack Game – Spiral Ascension
      *
-     * This level uses sacred geometry and the golden ratio to generate
-     * a winding, golden‑spiral path of 3dvr.tech billboards. When the player
-     * (a jetpack-equipped glTF model) “collides” with these billboards, they disappear,
-     * awarding points. Modern UX/UI principles guide our HUD and mobile controls.
+     * In this level a helix (spiral) of beautifully styled 3dvr.tech billboards
+     * guides the player upward into the sky. Follow the clear, upward‑spiraling path
+     * and reach the top to win the level!
      */
 
     // GLOBAL VARIABLES
     let scene, camera, renderer, clock;
     let player, playerVelocity;
-    let billboards = [];      // Extra floating decorations (if any)
-    let pathBillboards = [];  // Billboards along the golden spiral path
-    const keys = {};         // For keyboard & mobile button states
-    let score = 0;           // Player score
+    const keys = {};          // Track keyboard & mobile control states
+    let score = 0;
+    let gameActive = true;    // Game is active until win condition is met
+    const pathBillboards = []; // Array holding the spiral path billboards
+    const winHeight = 100;    // Y-value at which the level is won
 
-    // Physics & control constants
-    const GRAVITY    = new THREE.Vector3(0, -9.8, 0);
-    const THRUST     = 20;
+    // PHYSICS & CONTROL CONSTANTS
+    const GRAVITY = new THREE.Vector3(0, -9.8, 0);
+    const THRUST = 20;
     const MOVE_ACCEL = 10;
-    const MAX_SPEED  = 50;
+    const MAX_SPEED = 50;
 
-    // INITIALIZE THE SCENE
+    // INITIALIZATION FUNCTION
     function init() {
-      // Create scene, camera, renderer, and clock
+      // Set up the scene, camera, renderer, and clock
       scene = new THREE.Scene();
       scene.background = new THREE.Color(0x87ceeb);
       camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -114,7 +131,7 @@
       document.body.appendChild(renderer.domElement);
       clock = new THREE.Clock();
 
-      // Add lighting (ambient and directional)
+      // Add ambient and directional lighting
       const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
       scene.add(ambientLight);
       const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -129,13 +146,10 @@
       ground.position.y = 0;
       scene.add(ground);
 
-      // Optional: Add extra floating 3dvr.tech billboards (for decoration)
-      addBrandBillboards();
+      // Create a clear, upward‑spiraling path of billboards
+      createSpiralPath();
 
-      // Create our sacred path – a golden spiral of 3dvr.tech billboards
-      createGoldenSpiralPath();
-
-      // Setup event listeners
+      // Set up event listeners and mobile controls
       window.addEventListener('resize', onWindowResize, false);
       window.addEventListener('keydown', onKeyDown, false);
       window.addEventListener('keyup', onKeyUp, false);
@@ -145,41 +159,40 @@
       loadPlayer();
     }
 
-    // MOBILE CONTROLS – map on‑screen buttons to key states
+    // MOBILE CONTROLS – Map on‑screen buttons to key states
     function initMobileControls() {
-      // Left
-      let leftBtn = document.getElementById("left-btn");
+      const leftBtn = document.getElementById("left-btn");
       leftBtn.addEventListener("touchstart", e => { e.preventDefault(); keys["a"] = true; });
       leftBtn.addEventListener("touchend", e => { e.preventDefault(); keys["a"] = false; });
       leftBtn.addEventListener("mousedown", e => { e.preventDefault(); keys["a"] = true; });
       leftBtn.addEventListener("mouseup", e => { e.preventDefault(); keys["a"] = false; });
-      // Right
-      let rightBtn = document.getElementById("right-btn");
+
+      const rightBtn = document.getElementById("right-btn");
       rightBtn.addEventListener("touchstart", e => { e.preventDefault(); keys["d"] = true; });
       rightBtn.addEventListener("touchend", e => { e.preventDefault(); keys["d"] = false; });
       rightBtn.addEventListener("mousedown", e => { e.preventDefault(); keys["d"] = true; });
       rightBtn.addEventListener("mouseup", e => { e.preventDefault(); keys["d"] = false; });
-      // Up
-      let upBtn = document.getElementById("up-btn");
+
+      const upBtn = document.getElementById("up-btn");
       upBtn.addEventListener("touchstart", e => { e.preventDefault(); keys["w"] = true; });
       upBtn.addEventListener("touchend", e => { e.preventDefault(); keys["w"] = false; });
       upBtn.addEventListener("mousedown", e => { e.preventDefault(); keys["w"] = true; });
       upBtn.addEventListener("mouseup", e => { e.preventDefault(); keys["w"] = false; });
-      // Down
-      let downBtn = document.getElementById("down-btn");
+
+      const downBtn = document.getElementById("down-btn");
       downBtn.addEventListener("touchstart", e => { e.preventDefault(); keys["s"] = true; });
       downBtn.addEventListener("touchend", e => { e.preventDefault(); keys["s"] = false; });
       downBtn.addEventListener("mousedown", e => { e.preventDefault(); keys["s"] = true; });
       downBtn.addEventListener("mouseup", e => { e.preventDefault(); keys["s"] = false; });
-      // Fly (jetpack thrust)
-      let flyBtn = document.getElementById("fly-btn");
+
+      const flyBtn = document.getElementById("fly-btn");
       flyBtn.addEventListener("touchstart", e => { e.preventDefault(); keys[" "] = true; });
       flyBtn.addEventListener("touchend", e => { e.preventDefault(); keys[" "] = false; });
       flyBtn.addEventListener("mousedown", e => { e.preventDefault(); keys[" "] = true; });
       flyBtn.addEventListener("mouseup", e => { e.preventDefault(); keys[" "] = false; });
     }
 
-    // LOAD THE PLAYER MODEL (glTF) OR FALL BACK TO A SPHERE
+    // LOAD THE PLAYER MODEL (glTF) OR FALL BACK TO A SIMPLE SPHERE
     function loadPlayer() {
       const loader = new THREE.GLTFLoader();
       loader.load(
@@ -197,7 +210,7 @@
           flameMesh.visible = false;
           flameMesh.name = "flame";
           player.add(flameMesh);
-          // Add a small 3dvr.tech branding billboard above the model
+          // Add branding above the player
           addPlayerBranding();
           scene.add(player);
           playerVelocity = new THREE.Vector3();
@@ -206,7 +219,6 @@
         undefined,
         function(error) {
           console.error("Error loading model", error);
-          // Fallback: simple red sphere with a flame
           player = new THREE.Object3D();
           const bodyGeo = new THREE.SphereGeometry(0.5, 16, 16);
           const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
@@ -229,7 +241,7 @@
       );
     }
 
-    // ADD A BILLBOARD TO THE PLAYER (for branding)
+    // ADD A BRANDING BILLBOARD ABOVE THE PLAYER
     function addPlayerBranding() {
       const branding = createBillboard("3dvr.tech");
       branding.scale.set(0.5, 0.5, 0.5);
@@ -238,38 +250,28 @@
       player.add(branding);
     }
 
-    // ADD EXTRA FLOATING 3dvr.tech BILLBOARDS (for decoration)
-    function addBrandBillboards() {
-      const positions = [
-        { x: 10,  y: 5, z: -20 },
-        { x: -15, y: 3, z: 30 },
-        { x: 20,  y: 6, z: 15 },
-        { x: -25, y: 4, z: -10 },
-        { x: 5,   y: 8, z: -5 },
-        { x: -10, y: 6, z: 10 }
-      ];
-      positions.forEach(pos => {
-        const billboard = createBillboard("3dvr.tech");
-        billboard.position.set(pos.x, pos.y, pos.z);
-        scene.add(billboard);
-        billboards.push(billboard);
-      });
-    }
-
-    // CREATE A BILLBOARD MESH (using a text canvas)
+    // CREATE A BEAUTIFULLY STYLED BILLBOARD USING A CANVAS
     function createBillboard(text) {
-      const canvas = document.createElement('canvas');
       const size = 256;
+      const canvas = document.createElement('canvas');
       canvas.width = size;
       canvas.height = size;
       const ctx = canvas.getContext('2d');
-      ctx.fillStyle = "#ffffff";
+      // Create a radial gradient background (gold tones)
+      const gradient = ctx.createRadialGradient(size/2, size/2, size/8, size/2, size/2, size/2);
+      gradient.addColorStop(0, "#ffcc00");
+      gradient.addColorStop(1, "#ff6600");
+      ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, size, size);
-      ctx.font = "40px Arial";
-      ctx.fillStyle = "#000000";
+      // Draw the text in bold white with a black stroke
+      ctx.font = "bold 50px Arial";
+      ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(text, size / 2, size / 2);
+      ctx.fillText(text, size/2, size/2);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "#000000";
+      ctx.strokeText(text, size/2, size/2);
       const texture = new THREE.CanvasTexture(canvas);
       texture.needsUpdate = true;
       const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, transparent: true });
@@ -277,35 +279,29 @@
       return new THREE.Mesh(geometry, material);
     }
 
-    // CREATE A GOLDEN SPIRAL PATH OF 3dvr.tech BILLBOARDS
-    function createGoldenSpiralPath() {
-      // Use a logarithmic spiral: r = a * exp(b * theta)
-      // For a golden spiral, when theta increases by π/2, r multiplies by the golden ratio φ
-      const phi = 1.618;
-      const a = 1;
-      const b = Math.log(phi) / (Math.PI / 2);
-      const numBillboards = 15;
-      const maxTheta = 6 * Math.PI;
+    // CREATE A SPIRAL PATH (HELIX) OF BILLBOARDS THAT ASCENDS INTO THE SKY
+    function createSpiralPath() {
+      const numBillboards = 30;
+      const spiralRadius = 5;  // constant radius of the helix
       for (let i = 0; i < numBillboards; i++) {
-        const theta = (i / (numBillboards - 1)) * maxTheta;
-        const r = a * Math.exp(b * theta);
-        const x = r * Math.cos(theta);
-        const z = r * Math.sin(theta);
-        // Add a slight vertical oscillation for extra interest
-        const y = 2 + Math.sin(theta * 0.5);
+        const t = i / (numBillboards - 1);
+        const theta = t * (4 * Math.PI); // 4 full rotations
+        const y = t * winHeight;         // Y goes from 0 to winHeight
+        const x = spiralRadius * Math.cos(theta);
+        const z = spiralRadius * Math.sin(theta);
         const billboard = createBillboard("3dvr.tech");
-        billboard.scale.set(0.8, 0.8, 0.8);
+        billboard.scale.set(1, 1, 1);
         billboard.position.set(x, y, z);
         scene.add(billboard);
         pathBillboards.push(billboard);
       }
     }
 
-    // CHECK FOR COLLISIONS BETWEEN THE PLAYER AND THE PATH BILLBOARDS
+    // CHECK FOR COLLISIONS BETWEEN THE PLAYER AND PATH BILLBOARDS
+    // (Award points and remove the billboard when the player “hits” it.)
     function checkCollisions() {
       if (!player) return;
       const playerPos = player.position;
-      // For each billboard along the golden spiral path…
       for (let i = pathBillboards.length - 1; i >= 0; i--) {
         const billboard = pathBillboards[i];
         const distance = playerPos.distanceTo(billboard.position);
@@ -318,10 +314,22 @@
       }
     }
 
-    // UPDATE THE HUD (score display)
+    // CHECK THE WIN CONDITION – Has the player reached the top?
+    function checkWin() {
+      if (player && player.position.y >= winHeight - 2 && gameActive) {
+        winLevel();
+      }
+    }
+
+    // WIN LEVEL: Stop the game and display a win message.
+    function winLevel() {
+      gameActive = false;
+      document.getElementById("winMessage").style.display = "block";
+    }
+
+    // UPDATE THE HUD (Score display)
     function updateHUD() {
-      const hud = document.getElementById("hud");
-      hud.textContent = "Score: " + score;
+      document.getElementById("hud").textContent = "Score: " + score;
     }
 
     // EVENT HANDLERS
@@ -336,17 +344,19 @@
     // ANIMATION LOOP
     function animate() {
       requestAnimationFrame(animate);
+      if (!gameActive) return;  // Freeze game when level is won
       const delta = clock.getDelta();
       updatePlayer(delta);
       checkCollisions();
-      // Ensure all billboards face the camera
-      billboards.forEach(b => b.lookAt(camera.position));
+      checkWin();
+      // Ensure the spiral path billboards always face the camera
       pathBillboards.forEach(b => b.lookAt(camera.position));
       renderer.render(scene, camera);
     }
 
-    // UPDATE PLAYER MOVEMENT & CAMERA FOLLOW
+    // UPDATE PLAYER MOVEMENT AND CAMERA FOLLOWING
     function updatePlayer(delta) {
+      if (!gameActive) return;
       let acceleration = new THREE.Vector3().copy(GRAVITY);
       if (keys[" "] || keys["Spacebar"]) {
         acceleration.y += THRUST;
@@ -369,7 +379,7 @@
         playerVelocity.y = 0;
       }
       playerVelocity.multiplyScalar(0.99);
-      // Smoothly update camera to follow the player
+      // Smoothly update the camera to follow the player
       const desiredCameraPos = new THREE.Vector3(
         player.position.x,
         player.position.y + 5,
